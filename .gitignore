@@ -1,5 +1,6 @@
 *.iml
 .gradle
+.gradle/
 /local.properties
 /.idea/caches
 /.idea/libraries
@@ -21,9 +22,7 @@ local.properties
 bin/
 gen/
 out/
-.gradle/
 build/
-local.properties
 proguard/
 *.log
 .navigation/
@@ -31,6 +30,5 @@ captures/
 output.json
 *.hprof
 .idea/
-*.iml
 *.ipr
 *.iws
