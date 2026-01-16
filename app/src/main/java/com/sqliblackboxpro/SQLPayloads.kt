@@ -10,6 +10,7 @@ data class PayloadInfo(
 object SQLPayloads {
     
     private val customPayloads = mutableListOf<PayloadInfo>()
+    private val lock = Any()
     
     // Payload descriptions map
     private val payloadDescriptions = mapOf(
@@ -61,7 +62,9 @@ object SQLPayloads {
     
     // Basic SQL injection payloads for detection
     val DETECTION_PAYLOADS: List<String>
-        get() = baseDetectionPayloads + customPayloads.map { it.payload }
+        get() = synchronized(lock) {
+            baseDetectionPayloads + customPayloads.map { it.payload }
+        }
     
     private val baseDetectionPayloads = listOf(
         "' OR '1'='1",
@@ -124,7 +127,7 @@ object SQLPayloads {
     }
     
     // Get all payloads with their info
-    fun getAllPayloadInfo(): List<PayloadInfo> {
+    fun getAllPayloadInfo(): List<PayloadInfo> = synchronized(lock) {
         val allPayloads = mutableListOf<PayloadInfo>()
         
         baseDetectionPayloads.forEach { payload ->
@@ -180,21 +183,21 @@ object SQLPayloads {
         return allPayloads
     }
     
-    fun getPayloadDescription(payload: String): String {
+    fun getPayloadDescription(payload: String): String = synchronized(lock) {
         return customPayloads.find { it.payload == payload }?.description
             ?: payloadDescriptions[payload]
             ?: "SQL injection payload for testing application security vulnerabilities."
     }
     
-    fun addCustomPayload(payload: String, description: String, category: String = "Custom Payloads") {
+    fun addCustomPayload(payload: String, description: String, category: String = "Custom Payloads") = synchronized(lock) {
         customPayloads.add(PayloadInfo(payload, description, category, isCustom = true))
     }
     
-    fun removeCustomPayload(payload: String) {
+    fun removeCustomPayload(payload: String) = synchronized(lock) {
         customPayloads.removeAll { it.payload == payload }
     }
     
-    fun getCustomPayloads(): List<PayloadInfo> {
+    fun getCustomPayloads(): List<PayloadInfo> = synchronized(lock) {
         return customPayloads.toList()
     }
 }

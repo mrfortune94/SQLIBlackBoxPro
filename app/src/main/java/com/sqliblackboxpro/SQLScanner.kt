@@ -23,6 +23,10 @@ class SQLScanner {
         private const val MAX_TABLE_EXTRACTIONS = 5 // Limit table name extractions
         private const val MAX_EMAIL_EXTRACTIONS = 5 // Limit email extractions
         private const val MIN_HASH_LENGTH = 32 // Minimum length for MD5/SHA hashes
+        private const val MAX_VULNERABLE_RESPONSE_LENGTH = 1000 // Max response to store for vulnerable payloads
+        private const val RESPONSE_SEPARATOR_LENGTH = 50 // Length of separator line in responses
+        private const val MAX_DUMP_LINE_LENGTH = 200 // Max line length for dump data
+        private const val MAX_DUMP_LINES = 20 // Max lines to include from dump responses
     }
     
     private val standardClient = OkHttpClient.Builder()
@@ -108,7 +112,7 @@ class SQLScanner {
                         VulnerablePayload(
                             payload = payload,
                             description = description,
-                            response = "Status: $statusCode\n\n${body.take(1000)}"
+                            response = "Status: $statusCode\n\n${body.take(MAX_VULNERABLE_RESPONSE_LENGTH)}"
                         )
                     )
                     
@@ -449,7 +453,7 @@ class SQLScanner {
         
         return@withContext "HTTP Status: $statusCode\n\n" +
             "Full Response:\n" +
-            "=" .repeat(50) + "\n" +
+            "=".repeat(RESPONSE_SEPARATOR_LENGTH) + "\n" +
             body
     }
     
@@ -523,8 +527,8 @@ class SQLScanner {
                 } else {
                     // Try to parse raw response for data
                     val lines = body.lines()
-                        .filter { it.isNotBlank() && it.length < 200 }
-                        .take(20)
+                        .filter { it.isNotBlank() && it.length < MAX_DUMP_LINE_LENGTH }
+                        .take(MAX_DUMP_LINES)
                     if (lines.isNotEmpty()) {
                         dumpedData[category] = lines
                     }
