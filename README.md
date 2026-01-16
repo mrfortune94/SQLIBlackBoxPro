@@ -143,6 +143,42 @@ The app requires:
 - `INTERNET`: For HTTP requests
 - `ACCESS_NETWORK_STATE`: To check network availability
 
+## Building the App
+
+### Automated Builds (GitHub Actions)
+
+This repository includes automated workflows for building APKs:
+
+**Debug Builds**: Automatically triggered on push/PR to `main` or `develop` branches
+- Download debug APK from the Actions tab → Artifacts
+
+**Release Builds**: Triggered by version tags (e.g., `v1.0.0`) or manual dispatch
+- Signed APKs (when keystore secrets are configured)
+- Automatically creates GitHub Releases
+- Download from Releases section or Actions artifacts
+
+📖 See [WORKFLOWS_GUIDE.md](WORKFLOWS_GUIDE.md) for detailed instructions on:
+- Setting up release signing
+- Configuring GitHub Secrets
+- Manual workflow triggers
+- Local build instructions
+
+### Local Builds
+
+**Debug APK**:
+```bash
+./gradlew assembleDebug
+```
+Output: `app/build/outputs/apk/debug/app-debug.apk`
+
+**Release APK**:
+```bash
+./gradlew assembleRelease
+```
+Output: `app/build/outputs/apk/release/app-release.apk`
+
+For signed release builds, configure your keystore and environment variables as described in [WORKFLOWS_GUIDE.md](WORKFLOWS_GUIDE.md).
+
 ## Code Quality
 
 - ✅ **No placeholders or simulated data**: All scanning uses real HTTP requests

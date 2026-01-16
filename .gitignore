@@ -32,3 +32,8 @@ output.json
 .idea/
 *.ipr
 *.iws
+
+# Keystore files
+*.jks
+*.keystore
+release-keystore.jks
