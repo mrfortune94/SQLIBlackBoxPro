@@ -153,7 +153,7 @@ fun PayloadCard(
             }
             
             if (isExpanded) {
-                Divider(modifier = Modifier.padding(vertical = 8.dp))
+                HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
                 
                 // Full payload
                 Text(
