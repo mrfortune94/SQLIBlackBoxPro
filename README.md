@@ -1,6 +1,33 @@
 # SQLi BlackBox Pro - Android Application
 
-An Android application for SQL injection testing with Jetpack Compose UI.
+A **REAL**, production-ready Android application for SQL injection penetration testing with Jetpack Compose UI.
+
+## ⚠️ Important: This is NOT a Simulation
+
+**This app performs REAL SQL injection testing:**
+- ✅ Makes actual HTTP/HTTPS network requests using OkHttp
+- ✅ Tests real SQL injection payloads against target servers
+- ✅ Analyzes real server responses for SQL errors
+- ✅ Attempts real data extraction from vulnerable endpoints
+- ✅ Supports Tor SOCKS proxy for anonymous testing
+- ✅ Comprehensive logging to Android logcat for verification
+
+**NOT simulated/fake:**
+- ❌ Does NOT use hardcoded results
+- ❌ Does NOT work without internet connection
+- ❌ Does NOT simulate network delays
+- ❌ Requires real vulnerable targets to find vulnerabilities
+
+See [TESTING_GUIDE.md](TESTING_GUIDE.md) for instructions on how to verify the scanner performs real HTTP requests and testing.
+
+## Legal Notice
+
+**CRITICAL**: This tool performs real penetration testing. Only use on:
+- Systems you own
+- Systems where you have explicit written permission to test
+- Intentionally vulnerable test sites (e.g., http://testphp.vulnweb.com)
+
+**Unauthorized testing is ILLEGAL and can result in criminal prosecution.**
 
 ## Project Structure
 
@@ -38,6 +65,24 @@ SQLiBlackBoxPro/
 └── .gitignore                   # Git ignore rules
 ```
 
+## Testing the Scanner
+
+### Quick Test with Vulnerable Site
+To verify the scanner works, test with this intentionally vulnerable site:
+```
+http://testphp.vulnweb.com/artists.php?artist=1
+```
+
+### Verify Real Network Requests
+Check Android Studio Logcat (filter by "SQLScanner") to see:
+- Real-time scan progress
+- HTTP requests being made
+- Server responses received
+- Vulnerability detection
+- Data extraction attempts
+
+See [TESTING_GUIDE.md](TESTING_GUIDE.md) for detailed testing instructions and verification methods.
+
 ## Features
 
 ### Navigation Flow
@@ -66,9 +111,21 @@ SQLiBlackBoxPro/
 - **Jetpack Compose** for UI (Material 3 design)
 - **Navigation Compose** for screen navigation
 - **StateFlow** for reactive state management
-- **OkHttp** for HTTP client with proxy support
-- **Coroutines** for asynchronous operations
+- **OkHttp 4.12.0** for REAL HTTP/HTTPS requests
+- **Coroutines with Dispatchers.IO** for asynchronous network operations
 - **34+ SQL injection payloads** covering multiple database types
+- **50+ SQL error patterns** for vulnerability detection
+- **Comprehensive logging** with android.util.Log for debugging
+
+### Real Network Operations
+The scanner makes **actual HTTP requests** and is NOT a simulation:
+- Uses OkHttp client with real TCP connections
+- Supports HTTP, HTTPS, and SOCKS proxy (Tor)
+- Performs real DNS lookups
+- Handles network errors (timeouts, connection failures, DNS errors)
+- Injects SQL payloads into URL parameters
+- Parses actual server responses for SQL errors
+- Extracts real data from vulnerable responses (credentials, versions, tables, etc.)
 
 ### Build Configuration
 - Android Gradle Plugin: 8.2.2
