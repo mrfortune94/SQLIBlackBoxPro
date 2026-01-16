@@ -1,11 +1,17 @@
 package com.sqliblackboxpro
 
+import android.os.Environment
+import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import java.io.File
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 
 class ScanViewModel : ViewModel() {
     
@@ -13,6 +19,10 @@ class ScanViewModel : ViewModel() {
     
     private val CORRECT_PIN = "1234" // Simple PIN for demo purposes
     private val DUMP_PIN = "9999" // PIN for database dump feature
+    
+    companion object {
+        private const val TAG = "ScanViewModel"
+    }
     
     private val _pin = MutableStateFlow("")
     val pin: StateFlow<String> = _pin.asStateFlow()
@@ -169,10 +179,79 @@ class ScanViewModel : ViewModel() {
                 }
                 
                 val dumpedData = scanner.dumpDatabase(targetUrl.value, dbType, selectedMode.value)
-                _databaseDumpState.value = DatabaseDumpState.Success(dumpedData)
+                
+                // Save to file
+                val filePath = saveDatabaseDumpToFile(dumpedData, targetUrl.value, dbType)
+                
+                _databaseDumpState.value = DatabaseDumpState.Success(dumpedData, filePath)
             } catch (e: Exception) {
+                Log.e(TAG, "Database dump failed", e)
                 _databaseDumpState.value = DatabaseDumpState.Error(e.message ?: "Database dump failed")
             }
+        }
+    }
+    
+    private fun saveDatabaseDumpToFile(data: Map<String, List<String>>, url: String, dbType: DatabaseType): String? {
+        return try {
+            // Create directory in Downloads folder
+            val downloadsDir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS)
+            val sqlInjectionDir = File(downloadsDir, "SQLiBlackBoxPro")
+            if (!sqlInjectionDir.exists()) {
+                sqlInjectionDir.mkdirs()
+            }
+            
+            // Create filename with timestamp
+            val timestamp = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.US).format(Date())
+            val sanitizedUrl = url.replace(Regex("[^a-zA-Z0-9]"), "_").take(30)
+            val fileName = "DB_DUMP_${sanitizedUrl}_${timestamp}.txt"
+            val file = File(sqlInjectionDir, fileName)
+            
+            // Write data to file
+            file.bufferedWriter().use { writer ->
+                writer.write("=" .repeat(60))
+                writer.newLine()
+                writer.write("SQL INJECTION DATABASE DUMP REPORT")
+                writer.newLine()
+                writer.write("=" .repeat(60))
+                writer.newLine()
+                writer.newLine()
+                writer.write("Target URL: $url")
+                writer.newLine()
+                writer.write("Database Type: ${dbType.name}")
+                writer.newLine()
+                writer.write("Timestamp: ${SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.US).format(Date())}")
+                writer.newLine()
+                writer.write("Scan Mode: ${selectedMode.value}")
+                writer.newLine()
+                writer.write("=" .repeat(60))
+                writer.newLine()
+                writer.newLine()
+                
+                data.forEach { (category, items) ->
+                    writer.write("\n### $category ###")
+                    writer.newLine()
+                    writer.write("-" .repeat(60))
+                    writer.newLine()
+                    items.forEach { item ->
+                        writer.write("  - $item")
+                        writer.newLine()
+                    }
+                    writer.newLine()
+                }
+                
+                writer.write("\n")
+                writer.write("=" .repeat(60))
+                writer.newLine()
+                writer.write("END OF REPORT")
+                writer.newLine()
+                writer.write("=" .repeat(60))
+            }
+            
+            Log.i(TAG, "Database dump saved to: ${file.absolutePath}")
+            file.absolutePath
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to save database dump to file", e)
+            null
         }
     }
     

@@ -64,8 +64,11 @@ class SQLScanner {
         
         val client = when (mode) {
             ScanMode.STANDARD -> standardClient
-            ScanMode.TOR -> {
+            ScanMode.TOR, ScanMode.TOR_PROXY_FORCED -> {
                 Log.d(TAG, "Using Tor SOCKS proxy at 127.0.0.1:9050")
+                if (mode == ScanMode.TOR_PROXY_FORCED) {
+                    Log.w(TAG, "TOR_PROXY_FORCED mode: All traffic MUST go through Tor proxy. Will fail if Tor is not running.")
+                }
                 torClient
             }
             ScanMode.STEALTH -> createStealthClient()
@@ -430,7 +433,7 @@ class SQLScanner {
         
         val client = when (mode) {
             ScanMode.STANDARD -> standardClient
-            ScanMode.TOR -> torClient
+            ScanMode.TOR, ScanMode.TOR_PROXY_FORCED -> torClient
             ScanMode.STEALTH -> createStealthClient()
         }
         
@@ -465,7 +468,7 @@ class SQLScanner {
         
         val client = when (mode) {
             ScanMode.STANDARD -> standardClient
-            ScanMode.TOR -> torClient
+            ScanMode.TOR, ScanMode.TOR_PROXY_FORCED -> torClient
             ScanMode.STEALTH -> createStealthClient()
         }
         

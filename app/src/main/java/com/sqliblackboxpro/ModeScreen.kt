@@ -61,6 +61,16 @@ fun ModeScreen(
                 isSelected = selectedMode == ScanMode.STEALTH,
                 onSelected = onModeSelected
             )
+            
+            Spacer(modifier = Modifier.height(12.dp))
+            
+            ModeOption(
+                mode = ScanMode.TOR_PROXY_FORCED,
+                label = "🔒 Tor Proxy 24/7 (Forced)",
+                description = "COMPULSORY Tor SOCKS proxy routing for ALL requests. Maximum anonymity. Requires Tor running on 127.0.0.1:9050. Will fail if Tor is not available.",
+                isSelected = selectedMode == ScanMode.TOR_PROXY_FORCED,
+                onSelected = onModeSelected
+            )
         }
         
         Spacer(modifier = Modifier.height(32.dp))

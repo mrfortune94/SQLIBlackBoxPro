@@ -304,6 +304,7 @@ fun ResultsScreen(
         is DatabaseDumpState.Success -> {
             DatabaseDumpDialog(
                 dumpedData = databaseDumpState.dumpedData,
+                savedFilePath = databaseDumpState.savedFilePath,
                 onDismiss = onResetDatabaseDump
             )
         }
@@ -438,6 +439,7 @@ fun InjectionDialog(
 @Composable
 fun DatabaseDumpDialog(
     dumpedData: Map<String, List<String>>,
+    savedFilePath: String?,
     onDismiss: () -> Unit
 ) {
     Dialog(onDismissRequest = onDismiss) {
@@ -456,7 +458,32 @@ fun DatabaseDumpDialog(
                     color = MaterialTheme.colorScheme.error
                 )
                 
-                Spacer(modifier = Modifier.height(16.dp))
+                Spacer(modifier = Modifier.height(8.dp))
+                
+                // Show file saved message if available
+                if (savedFilePath != null) {
+                    Card(
+                        colors = CardDefaults.cardColors(
+                            containerColor = MaterialTheme.colorScheme.primaryContainer
+                        ),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Column(modifier = Modifier.padding(12.dp)) {
+                            Text(
+                                text = "💾 Saved to Device Storage",
+                                style = MaterialTheme.typography.titleSmall,
+                                fontWeight = FontWeight.Bold
+                            )
+                            Spacer(modifier = Modifier.height(4.dp))
+                            Text(
+                                text = savedFilePath,
+                                style = MaterialTheme.typography.bodySmall,
+                                fontFamily = FontFamily.Monospace
+                            )
+                        }
+                    }
+                    Spacer(modifier = Modifier.height(16.dp))
+                }
                 
                 Column(
                     modifier = Modifier

@@ -3,7 +3,8 @@ package com.sqliblackboxpro
 enum class ScanMode {
     STANDARD,
     TOR,
-    STEALTH
+    STEALTH,
+    TOR_PROXY_FORCED // Compulsory 24/7 proxy through Tor for maximum anonymity
 }
 
 enum class DatabaseType {
@@ -47,6 +48,6 @@ sealed class InjectionState {
 sealed class DatabaseDumpState {
     object Idle : DatabaseDumpState()
     object Dumping : DatabaseDumpState()
-    data class Success(val dumpedData: Map<String, List<String>>) : DatabaseDumpState()
+    data class Success(val dumpedData: Map<String, List<String>>, val savedFilePath: String? = null) : DatabaseDumpState()
     data class Error(val message: String) : DatabaseDumpState()
 }
