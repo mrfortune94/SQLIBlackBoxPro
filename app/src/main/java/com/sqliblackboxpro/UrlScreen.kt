@@ -5,7 +5,6 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 
 @Composable
@@ -24,56 +23,10 @@ fun UrlScreen(
         verticalArrangement = Arrangement.Center
     ) {
         Text(
-            text = "🔒 Target URL (via Tor)",
+            text = "Target URL",
             style = MaterialTheme.typography.headlineMedium,
-            modifier = Modifier.padding(bottom = 16.dp)
+            modifier = Modifier.padding(bottom = 32.dp)
         )
-        
-        Card(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(bottom = 16.dp),
-            colors = CardDefaults.cardColors(
-                containerColor = MaterialTheme.colorScheme.primaryContainer
-            )
-        ) {
-            Column(modifier = Modifier.padding(12.dp)) {
-                Text(
-                    text = "🔒 Tor Protection Active",
-                    style = MaterialTheme.typography.titleSmall,
-                    fontWeight = FontWeight.Bold,
-                    modifier = Modifier.padding(bottom = 4.dp)
-                )
-                Text(
-                    text = "All traffic will be anonymized through Tor network. Your IP address and device fingerprint will be protected.",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onPrimaryContainer
-                )
-            }
-        }
-        
-        Card(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(bottom = 24.dp),
-            colors = CardDefaults.cardColors(
-                containerColor = MaterialTheme.colorScheme.secondaryContainer
-            )
-        ) {
-            Column(modifier = Modifier.padding(12.dp)) {
-                Text(
-                    text = "ℹ️ Legal Notice",
-                    style = MaterialTheme.typography.titleSmall,
-                    fontWeight = FontWeight.Bold,
-                    modifier = Modifier.padding(bottom = 4.dp)
-                )
-                Text(
-                    text = "This tool performs REAL SQL injection testing. Only test URLs you own or have explicit permission to test. Unauthorized testing is illegal.",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSecondaryContainer
-                )
-            }
-        }
         
         OutlinedTextField(
             value = url,
@@ -82,26 +35,16 @@ fun UrlScreen(
                 error = false
             },
             label = { Text("Enter target URL") },
-            placeholder = { Text("http://testphp.vulnweb.com/artists.php?artist=1") },
+            placeholder = { Text("http://example.com/page.php") },
             isError = error,
             supportingText = if (error) {
                 { Text("Please enter a valid URL (http:// or https://)") }
-            } else {
-                { Text("Include full URL with protocol (http:// or https://)") }
-            },
-            singleLine = false,
-            maxLines = 3,
+            } else null,
+            singleLine = true,
             modifier = Modifier.fillMaxWidth()
         )
         
-        Spacer(modifier = Modifier.height(8.dp))
-        
-        Text(
-            text = "Example test site: http://testphp.vulnweb.com/artists.php?artist=1",
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.padding(bottom = 16.dp)
-        )
+        Spacer(modifier = Modifier.height(24.dp))
         
         Button(
             onClick = {

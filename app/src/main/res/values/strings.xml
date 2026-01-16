@@ -4,7 +4,6 @@
     <string name="pin_screen_title">Enter PIN</string>
     <string name="pin_hint">Enter 4-digit PIN</string>
     <string name="pin_error">PIN must be 4 digits</string>
-    <string name="invalid_pin_error">Invalid PIN. Access denied.</string>
     <string name="continue_button">Continue</string>
     <string name="url_screen_title">Target URL</string>
     <string name="url_hint">Enter target URL</string>
@@ -21,3 +20,4 @@
     <string name="database_type">Database Type: %s</string>
     <string name="extracted_data">Extracted Data:</string>
     <string name="error_occurred">Error: %s</string>
+</resources>

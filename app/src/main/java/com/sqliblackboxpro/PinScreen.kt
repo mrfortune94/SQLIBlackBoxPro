@@ -14,10 +14,10 @@ import androidx.compose.ui.unit.dp
 fun PinScreen(
     pin: String,
     onPinChange: (String) -> Unit,
-    onContinue: () -> Unit,
-    errorMessage: String? = null,
-    onViewLibrary: () -> Unit = {}
+    onContinue: () -> Unit
 ) {
+    var error by remember { mutableStateOf(false) }
+    
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -36,12 +36,13 @@ fun PinScreen(
             onValueChange = { 
                 if (it.length <= 4 && it.all { char -> char.isDigit() }) {
                     onPinChange(it)
+                    error = false
                 }
             },
             label = { Text("4-digit PIN") },
-            isError = errorMessage != null,
-            supportingText = if (errorMessage != null) {
-                { Text(errorMessage, color = MaterialTheme.colorScheme.error) }
+            isError = error,
+            supportingText = if (error) {
+                { Text("PIN must be 4 digits") }
             } else null,
             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword),
             visualTransformation = PasswordVisualTransformation(),
@@ -52,19 +53,16 @@ fun PinScreen(
         Spacer(modifier = Modifier.height(24.dp))
         
         Button(
-            onClick = { onContinue() },
+            onClick = {
+                if (pin.length == 4) {
+                    onContinue()
+                } else {
+                    error = true
+                }
+            },
             modifier = Modifier.fillMaxWidth()
         ) {
             Text("Continue")
-        }
-        
-        Spacer(modifier = Modifier.height(12.dp))
-        
-        OutlinedButton(
-            onClick = onViewLibrary,
-            modifier = Modifier.fillMaxWidth()
-        ) {
-            Text("📚 View SQL Injection Library")
         }
     }
 }

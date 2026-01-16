@@ -61,9 +61,6 @@ dependencies {
     implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.6.2")
     implementation("com.squareup.okhttp3:okhttp:4.12.0")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.7.3")
-    // NetCipher for Orbot integration - Guardian Project's official library
-    implementation("info.guardianproject.netcipher:netcipher:2.1.0")
-    implementation("info.guardianproject.netcipher:netcipher-okhttp3:2.1.0")
     debugImplementation("androidx.compose.ui:ui-tooling")
     debugImplementation("androidx.compose.ui:ui-test-manifest")
 }
