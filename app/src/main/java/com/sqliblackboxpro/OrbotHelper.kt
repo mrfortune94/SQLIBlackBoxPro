@@ -5,7 +5,6 @@ import android.content.Intent
 import android.content.pm.PackageManager
 import android.net.Uri
 import android.util.Log
-import info.guardianproject.netcipher.proxy.OrbotHelper
 import kotlinx.coroutines.delay
 import java.net.Socket
 

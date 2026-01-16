@@ -29,3 +29,11 @@ sealed class ScanState {
     data class Success(val result: ScanResult) : ScanState()
     data class Error(val message: String) : ScanState()
 }
+
+sealed class TorState {
+    object Checking : TorState()
+    object NotInstalled : TorState()
+    object InstalledNotRunning : TorState()
+    object Running : TorState()
+    data class Error(val message: String) : TorState()
+}

