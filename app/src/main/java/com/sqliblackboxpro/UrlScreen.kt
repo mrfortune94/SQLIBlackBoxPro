@@ -25,8 +25,31 @@ fun UrlScreen(
         Text(
             text = "Target URL",
             style = MaterialTheme.typography.headlineMedium,
-            modifier = Modifier.padding(bottom = 32.dp)
+            modifier = Modifier.padding(bottom = 16.dp)
         )
+        
+        Card(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(bottom = 24.dp),
+            colors = CardDefaults.cardColors(
+                containerColor = MaterialTheme.colorScheme.secondaryContainer
+            )
+        ) {
+            Column(modifier = Modifier.padding(12.dp)) {
+                Text(
+                    text = "ℹ️ Important",
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = androidx.compose.ui.text.font.FontWeight.Bold,
+                    modifier = Modifier.padding(bottom = 4.dp)
+                )
+                Text(
+                    text = "This tool performs REAL SQL injection testing. Only test URLs you own or have explicit permission to test. Unauthorized testing is illegal.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSecondaryContainer
+                )
+            }
+        }
         
         OutlinedTextField(
             value = url,
@@ -35,16 +58,26 @@ fun UrlScreen(
                 error = false
             },
             label = { Text("Enter target URL") },
-            placeholder = { Text("http://example.com/page.php") },
+            placeholder = { Text("http://testphp.vulnweb.com/artists.php?artist=1") },
             isError = error,
             supportingText = if (error) {
                 { Text("Please enter a valid URL (http:// or https://)") }
-            } else null,
-            singleLine = true,
+            } else {
+                { Text("Include full URL with protocol (http:// or https://)") }
+            },
+            singleLine = false,
+            maxLines = 3,
             modifier = Modifier.fillMaxWidth()
         )
         
-        Spacer(modifier = Modifier.height(24.dp))
+        Spacer(modifier = Modifier.height(8.dp))
+        
+        Text(
+            text = "Example test site: http://testphp.vulnweb.com/artists.php?artist=1",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.padding(bottom = 16.dp)
+        )
         
         Button(
             onClick = {

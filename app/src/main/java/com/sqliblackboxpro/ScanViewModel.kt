@@ -64,10 +64,20 @@ class ScanViewModel : ViewModel() {
         viewModelScope.launch {
             _scanState.value = ScanState.Scanning
             try {
+                // Validate URL before scanning
+                if (!validateUrl()) {
+                    _scanState.value = ScanState.Error("Invalid URL. Please enter a valid http:// or https:// URL")
+                    return@launch
+                }
+                
                 val result = scanner.scanURL(targetUrl.value, selectedMode.value)
                 _scanState.value = ScanState.Success(result)
+            } catch (e: IllegalArgumentException) {
+                _scanState.value = ScanState.Error(e.message ?: "Invalid input")
+            } catch (e: java.io.IOException) {
+                _scanState.value = ScanState.Error("Network error: ${e.message ?: "Cannot connect to server"}")
             } catch (e: Exception) {
-                _scanState.value = ScanState.Error(e.message ?: "Unknown error occurred")
+                _scanState.value = ScanState.Error("Scan failed: ${e.message ?: "Unknown error occurred"}")
             }
         }
     }

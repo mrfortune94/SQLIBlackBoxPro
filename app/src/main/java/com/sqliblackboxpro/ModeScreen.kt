@@ -36,8 +36,8 @@ fun ModeScreen(
         ) {
             ModeOption(
                 mode = ScanMode.STANDARD,
-                label = "Standard",
-                description = "Direct HTTP requests",
+                label = "Standard Mode",
+                description = "Direct HTTP/HTTPS requests - Fast and reliable for basic testing",
                 isSelected = selectedMode == ScanMode.STANDARD,
                 onSelected = onModeSelected
             )
@@ -46,8 +46,8 @@ fun ModeScreen(
             
             ModeOption(
                 mode = ScanMode.TOR,
-                label = "Tor (SOCKS Proxy)",
-                description = "Route through Tor network (127.0.0.1:9050)",
+                label = "Tor Mode",
+                description = "Routes through Tor SOCKS proxy (127.0.0.1:9050) - Requires Tor running locally. Provides anonymity but slower.",
                 isSelected = selectedMode == ScanMode.TOR,
                 onSelected = onModeSelected
             )
@@ -56,8 +56,8 @@ fun ModeScreen(
             
             ModeOption(
                 mode = ScanMode.STEALTH,
-                label = "Stealth",
-                description = "Randomized User-Agent spoofing",
+                label = "Stealth Mode",
+                description = "Randomizes User-Agent headers to avoid detection - Good for evading basic WAF rules",
                 isSelected = selectedMode == ScanMode.STEALTH,
                 onSelected = onModeSelected
             )
