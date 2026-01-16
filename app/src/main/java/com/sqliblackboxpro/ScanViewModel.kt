@@ -22,6 +22,8 @@ class ScanViewModel : ViewModel() {
     
     companion object {
         private const val TAG = "ScanViewModel"
+        private const val REPORT_LINE_WIDTH = 60 // Width of separator lines in reports
+        private const val MAX_URL_LENGTH_IN_FILENAME = 30 // Max URL chars in filename
     }
     
     private val _pin = MutableStateFlow("")
@@ -202,17 +204,17 @@ class ScanViewModel : ViewModel() {
             
             // Create filename with timestamp
             val timestamp = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.US).format(Date())
-            val sanitizedUrl = url.replace(Regex("[^a-zA-Z0-9]"), "_").take(30)
+            val sanitizedUrl = url.replace(Regex("[^a-zA-Z0-9]"), "_").take(MAX_URL_LENGTH_IN_FILENAME)
             val fileName = "DB_DUMP_${sanitizedUrl}_${timestamp}.txt"
             val file = File(sqlInjectionDir, fileName)
             
             // Write data to file
             file.bufferedWriter().use { writer ->
-                writer.write("=" .repeat(60))
+                writer.write("=".repeat(REPORT_LINE_WIDTH))
                 writer.newLine()
                 writer.write("SQL INJECTION DATABASE DUMP REPORT")
                 writer.newLine()
-                writer.write("=" .repeat(60))
+                writer.write("=".repeat(REPORT_LINE_WIDTH))
                 writer.newLine()
                 writer.newLine()
                 writer.write("Target URL: $url")
@@ -223,14 +225,14 @@ class ScanViewModel : ViewModel() {
                 writer.newLine()
                 writer.write("Scan Mode: ${selectedMode.value}")
                 writer.newLine()
-                writer.write("=" .repeat(60))
+                writer.write("=".repeat(REPORT_LINE_WIDTH))
                 writer.newLine()
                 writer.newLine()
                 
                 data.forEach { (category, items) ->
                     writer.write("\n### $category ###")
                     writer.newLine()
-                    writer.write("-" .repeat(60))
+                    writer.write("-".repeat(REPORT_LINE_WIDTH))
                     writer.newLine()
                     items.forEach { item ->
                         writer.write("  - $item")
@@ -240,11 +242,11 @@ class ScanViewModel : ViewModel() {
                 }
                 
                 writer.write("\n")
-                writer.write("=" .repeat(60))
+                writer.write("=".repeat(REPORT_LINE_WIDTH))
                 writer.newLine()
                 writer.write("END OF REPORT")
                 writer.newLine()
-                writer.write("=" .repeat(60))
+                writer.write("=".repeat(REPORT_LINE_WIDTH))
             }
             
             Log.i(TAG, "Database dump saved to: ${file.absolutePath}")
