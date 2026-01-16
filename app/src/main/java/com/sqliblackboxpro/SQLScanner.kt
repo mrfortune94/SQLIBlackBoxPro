@@ -20,6 +20,9 @@ class SQLScanner {
         private const val EARLY_FAILURE_THRESHOLD = 3 // Fail fast if first 3 payloads all error
         private const val MAX_EXTRACTION_PAYLOADS = 5 // Try up to 5 data extraction payloads
         private const val MAX_EXTRACTED_ITEMS = 15 // Limit extracted data items
+        private const val MAX_TABLE_EXTRACTIONS = 5 // Limit table name extractions
+        private const val MAX_EMAIL_EXTRACTIONS = 5 // Limit email extractions
+        private const val MIN_HASH_LENGTH = 32 // Minimum length for MD5/SHA hashes
     }
     
     private val standardClient = OkHttpClient.Builder()
@@ -275,7 +278,7 @@ class SQLScanner {
             "\\[Microsoft\\]\\[ODBC",
             
             // Oracle errors
-            "ORA-[0-9]{5}",
+            "ORA-[0-9]{4,5}",
             "Oracle.*Driver",
             "Oracle.*Error",
             
@@ -360,7 +363,7 @@ class SQLScanner {
         try {
             // Look for common data patterns
             // Extract potential usernames and password hashes
-            val usernamePattern = Regex("([a-zA-Z0-9_-]{3,}):(\\$[^\\s,]+|[a-f0-9]{32,})")
+            val usernamePattern = Regex("([a-zA-Z0-9_-]{3,}):(\\$[^\\s,]+|[a-f0-9]{$MIN_HASH_LENGTH,})")
             usernamePattern.findAll(response).forEach { match ->
                 val user = match.groupValues[1]
                 val hash = match.groupValues[2].take(50) // Limit hash display
@@ -377,14 +380,14 @@ class SQLScanner {
             
             // Extract table names  
             val tablePattern = Regex("(?:table|from)\\s+([a-zA-Z0-9_-]+)", RegexOption.IGNORE_CASE)
-            tablePattern.findAll(response).take(5).forEach { match ->
+            tablePattern.findAll(response).take(MAX_TABLE_EXTRACTIONS).forEach { match ->
                 extracted.add("Table: ${match.groupValues[1]}")
                 Log.d(TAG, "Extracted table name: ${match.groupValues[1]}")
             }
             
             // Extract email addresses
             val emailPattern = Regex("[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}")
-            emailPattern.findAll(response).take(5).forEach { match ->
+            emailPattern.findAll(response).take(MAX_EMAIL_EXTRACTIONS).forEach { match ->
                 extracted.add("Email: ${match.value}")
                 Log.d(TAG, "Extracted email: ${match.value}")
             }
