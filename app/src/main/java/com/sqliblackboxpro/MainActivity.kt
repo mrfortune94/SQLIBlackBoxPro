@@ -8,6 +8,7 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
@@ -16,6 +17,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
+import kotlinx.coroutines.launch
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -37,6 +39,8 @@ class MainActivity : ComponentActivity() {
 fun SQLiBlackBoxProApp() {
     val navController = rememberNavController()
     val viewModel: ScanViewModel = viewModel()
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
     
     val pin by viewModel.pin.collectAsState()
     val pinError by viewModel.pinError.collectAsState()
@@ -48,6 +52,12 @@ fun SQLiBlackBoxProApp() {
     val showDumpPinDialog by viewModel.showDumpPinDialog.collectAsState()
     val dumpPin by viewModel.dumpPin.collectAsState()
     val dumpPinError by viewModel.dumpPinError.collectAsState()
+    val torState by viewModel.torState.collectAsState()
+    
+    // Check Tor status on startup
+    LaunchedEffect(Unit) {
+        viewModel.checkTorStatus(context)
+    }
     
     NavHost(navController = navController, startDestination = "pin") {
         composable("pin") {
@@ -56,12 +66,32 @@ fun SQLiBlackBoxProApp() {
                 onPinChange = { viewModel.setPin(it) },
                 onContinue = {
                     if (viewModel.validatePin()) {
-                        navController.navigate("url")
+                        navController.navigate("torCheck")
                     }
                 },
                 errorMessage = pinError,
                 onViewLibrary = {
                     navController.navigate("library")
+                }
+            )
+        }
+        
+        composable("torCheck") {
+            TorCheckScreen(
+                torState = torState,
+                onCheckAgain = {
+                    scope.launch {
+                        viewModel.checkTorStatus(context)
+                    }
+                },
+                onLaunchOrbot = {
+                    TorManager.launchOrbot(context)
+                },
+                onInstallOrbot = {
+                    TorManager.openOrbotInPlayStore(context)
+                },
+                onContinue = {
+                    navController.navigate("url")
                 }
             )
         }
@@ -72,19 +102,10 @@ fun SQLiBlackBoxProApp() {
                 onUrlChange = { viewModel.setTargetUrl(it) },
                 onContinue = {
                     if (viewModel.validateUrl()) {
-                        navController.navigate("mode")
+                        // Skip mode selection screen - go directly to scan
+                        viewModel.startScan()
+                        navController.navigate("results")
                     }
-                }
-            )
-        }
-        
-        composable("mode") {
-            ModeScreen(
-                selectedMode = selectedMode,
-                onModeSelected = { viewModel.setMode(it) },
-                onStartScan = {
-                    viewModel.startScan()
-                    navController.navigate("results")
                 }
             )
         }

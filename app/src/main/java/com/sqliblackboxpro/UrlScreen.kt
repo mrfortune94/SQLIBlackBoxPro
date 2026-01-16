@@ -24,10 +24,33 @@ fun UrlScreen(
         verticalArrangement = Arrangement.Center
     ) {
         Text(
-            text = "Target URL",
+            text = "🔒 Target URL (via Tor)",
             style = MaterialTheme.typography.headlineMedium,
             modifier = Modifier.padding(bottom = 16.dp)
         )
+        
+        Card(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(bottom = 16.dp),
+            colors = CardDefaults.cardColors(
+                containerColor = MaterialTheme.colorScheme.primaryContainer
+            )
+        ) {
+            Column(modifier = Modifier.padding(12.dp)) {
+                Text(
+                    text = "🔒 Tor Protection Active",
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier.padding(bottom = 4.dp)
+                )
+                Text(
+                    text = "All traffic will be anonymized through Tor network. Your IP address and device fingerprint will be protected.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onPrimaryContainer
+                )
+            }
+        }
         
         Card(
             modifier = Modifier
@@ -39,7 +62,7 @@ fun UrlScreen(
         ) {
             Column(modifier = Modifier.padding(12.dp)) {
                 Text(
-                    text = "ℹ️ Important",
+                    text = "ℹ️ Legal Notice",
                     style = MaterialTheme.typography.titleSmall,
                     fontWeight = FontWeight.Bold,
                     modifier = Modifier.padding(bottom = 4.dp)

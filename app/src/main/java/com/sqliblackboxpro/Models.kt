@@ -1,10 +1,9 @@
 package com.sqliblackboxpro
 
+// Removed all non-Tor modes - app now ONLY routes through Tor for maximum anonymity
+// Fail-closed architecture: if Tor is not available, app will not function
 enum class ScanMode {
-    STANDARD,
-    TOR,
-    STEALTH,
-    TOR_PROXY_FORCED // Compulsory 24/7 proxy through Tor for maximum anonymity
+    TOR_ONLY // Compulsory Tor routing - all traffic through Orbot SOCKS proxy
 }
 
 enum class DatabaseType {
@@ -50,4 +49,12 @@ sealed class DatabaseDumpState {
     object Dumping : DatabaseDumpState()
     data class Success(val dumpedData: Map<String, List<String>>, val savedFilePath: String? = null) : DatabaseDumpState()
     data class Error(val message: String) : DatabaseDumpState()
+}
+
+sealed class TorState {
+    object Checking : TorState()
+    object NotInstalled : TorState()
+    object InstalledNotRunning : TorState()
+    object Running : TorState()
+    data class Error(val message: String) : TorState()
 }

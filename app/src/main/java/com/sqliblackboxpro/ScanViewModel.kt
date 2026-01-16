@@ -35,8 +35,11 @@ class ScanViewModel : ViewModel() {
     private val _targetUrl = MutableStateFlow("")
     val targetUrl: StateFlow<String> = _targetUrl.asStateFlow()
     
-    private val _selectedMode = MutableStateFlow(ScanMode.STANDARD)
+    private val _selectedMode = MutableStateFlow(ScanMode.TOR_ONLY)
     val selectedMode: StateFlow<ScanMode> = _selectedMode.asStateFlow()
+    
+    private val _torState = MutableStateFlow<TorState>(TorState.Checking)
+    val torState: StateFlow<TorState> = _torState.asStateFlow()
     
     private val _scanState = MutableStateFlow<ScanState>(ScanState.Idle)
     val scanState: StateFlow<ScanState> = _scanState.asStateFlow()
@@ -265,5 +268,17 @@ class ScanViewModel : ViewModel() {
         _scanState.value = ScanState.Idle
         _injectionState.value = InjectionState.Idle
         _databaseDumpState.value = DatabaseDumpState.Idle
+    }
+    
+    /**
+     * Check Tor status - must be called with application context
+     */
+    suspend fun checkTorStatus(context: android.content.Context) {
+        _torState.value = TorState.Checking
+        _torState.value = when {
+            !TorManager.isOrbotInstalled(context) -> TorState.NotInstalled
+            !TorManager.isTorRunning() -> TorState.InstalledNotRunning
+            else -> TorState.Running
+        }
     }
 }
