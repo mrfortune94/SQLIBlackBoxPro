@@ -81,7 +81,7 @@ fun TorCheckScreen(
                         colors = ButtonDefaults.buttonColors(
                             containerColor = MaterialTheme.colorScheme.error
                         )
-                    )  {
+                    ) {
                         Text("Install Orbot from Play Store")
                     }
                     Spacer(modifier = Modifier.height(16.dp))
