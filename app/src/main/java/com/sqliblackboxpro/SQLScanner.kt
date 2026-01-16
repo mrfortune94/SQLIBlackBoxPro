@@ -180,15 +180,17 @@ class SQLScanner {
         
         // Add diagnostic info if no vulnerability found
         if (!vulnerabilityFound && responseDetails.isEmpty()) {
+            val errorSummary = if (errorMessages.isNotEmpty()) {
+                "Errors encountered:\n" + errorMessages.take(5).joinToString("\n")
+            } else {
+                "All requests completed successfully but no SQL errors were found in responses."
+            }
+            
             responseDetails = "Scan Summary:\n" +
                 "- Tested $testedPayloads payloads\n" +
                 "- Encountered $errorCount errors\n" +
                 "- No SQL injection vulnerability detected\n\n" +
-                if (errorMessages.isNotEmpty()) {
-                    "Errors encountered:\n" + errorMessages.take(5).joinToString("\n")
-                } else {
-                    "All requests completed successfully but no SQL errors were found in responses."
-                }
+                errorSummary
         }
         
         ScanResult(
