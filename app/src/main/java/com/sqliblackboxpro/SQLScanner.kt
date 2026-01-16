@@ -15,12 +15,17 @@ class SQLScanner {
     
     companion object {
         private const val TAG = "SQLScanner"
+        private const val CONNECT_TIMEOUT_SECONDS = 15L
+        private const val READ_TIMEOUT_SECONDS = 15L
+        private const val EARLY_FAILURE_THRESHOLD = 3 // Fail fast if first 3 payloads all error
+        private const val MAX_EXTRACTION_PAYLOADS = 5 // Try up to 5 data extraction payloads
+        private const val MAX_EXTRACTED_ITEMS = 15 // Limit extracted data items
     }
     
     private val standardClient = OkHttpClient.Builder()
-        .connectTimeout(15, TimeUnit.SECONDS)
-        .readTimeout(15, TimeUnit.SECONDS)
-        .writeTimeout(15, TimeUnit.SECONDS)
+        .connectTimeout(CONNECT_TIMEOUT_SECONDS, TimeUnit.SECONDS)
+        .readTimeout(READ_TIMEOUT_SECONDS, TimeUnit.SECONDS)
+        .writeTimeout(CONNECT_TIMEOUT_SECONDS, TimeUnit.SECONDS)
         .followRedirects(true)
         .followSslRedirects(true)
         .build()
@@ -28,7 +33,7 @@ class SQLScanner {
     private val torClient = OkHttpClient.Builder()
         .connectTimeout(30, TimeUnit.SECONDS)
         .readTimeout(30, TimeUnit.SECONDS)
-        .writeTimeout(15, TimeUnit.SECONDS)
+        .writeTimeout(CONNECT_TIMEOUT_SECONDS, TimeUnit.SECONDS)
         .proxy(Proxy(Proxy.Type.SOCKS, InetSocketAddress("127.0.0.1", 9050)))
         .followRedirects(true)
         .followSslRedirects(true)
@@ -120,7 +125,7 @@ class SQLScanner {
                 errorMessages.add(msg)
                 Log.e(TAG, msg, e)
                 // If all payloads fail with network errors, this is a problem
-                if (errorCount >= 3 && testedPayloads <= 3) {
+                if (errorCount >= EARLY_FAILURE_THRESHOLD && testedPayloads <= EARLY_FAILURE_THRESHOLD) {
                     throw IOException("Network connection failed. Please check your internet connection.")
                 }
             } catch (e: Exception) {
@@ -144,7 +149,7 @@ class SQLScanner {
             }
             
             Log.d(TAG, "Attempting data extraction with ${extractionPayloads.size} payloads...")
-            for (payload in extractionPayloads.take(5)) { // Try first 5 extraction payloads
+            for (payload in extractionPayloads.take(MAX_EXTRACTION_PAYLOADS)) {
                 try {
                     val testUrl = buildTestUrl(url, payload)
                     val request = Request.Builder()
@@ -197,9 +202,9 @@ class SQLScanner {
     
     private fun createStealthClient(): OkHttpClient {
         return OkHttpClient.Builder()
-            .connectTimeout(15, TimeUnit.SECONDS)
-            .readTimeout(15, TimeUnit.SECONDS)
-            .writeTimeout(15, TimeUnit.SECONDS)
+            .connectTimeout(CONNECT_TIMEOUT_SECONDS, TimeUnit.SECONDS)
+            .readTimeout(READ_TIMEOUT_SECONDS, TimeUnit.SECONDS)
+            .writeTimeout(CONNECT_TIMEOUT_SECONDS, TimeUnit.SECONDS)
             .followRedirects(true)
             .followSslRedirects(true)
             .build()
@@ -212,16 +217,21 @@ class SQLScanner {
         
         // Try multiple injection points for better coverage
         return when {
-            // If URL already has parameters, inject into existing parameter
+            // If URL already has parameters, inject into first parameter value
             baseUrl.contains("?") -> {
                 val parts = baseUrl.split("?", limit = 2)
                 val base = parts[0]
                 val params = parts[1]
-                // Inject into first parameter value
+                // Replace first parameter's value with payload
                 val firstParam = params.split("&")[0]
                 if (firstParam.contains("=")) {
                     val paramName = firstParam.split("=")[0]
-                    "${base}?${paramName}=${encodedPayload}&${params}"
+                    val remainingParams = params.split("&").drop(1)
+                    if (remainingParams.isNotEmpty()) {
+                        "${base}?${paramName}=${encodedPayload}&${remainingParams.joinToString("&")}"
+                    } else {
+                        "${base}?${paramName}=${encodedPayload}"
+                    }
                 } else {
                     "${baseUrl}&test=${encodedPayload}"
                 }
@@ -324,7 +334,7 @@ class SQLScanner {
                 DatabaseType.MSSQL
             }
             
-            Regex("ORA-[0-9]{5}").containsMatchIn(response) ||
+            Regex("ORA-[0-9]{4,5}").containsMatchIn(response) ||
             response.contains("oracle", ignoreCase = true) -> {
                 Log.d(TAG, "Detected: Oracle")
                 DatabaseType.ORACLE
@@ -388,6 +398,6 @@ class SQLScanner {
             Log.e(TAG, "Error extracting data: ${e.message}", e)
         }
         
-        return extracted.distinct().take(15) // Limit to first 15 unique extractions
+        return extracted.distinct().take(MAX_EXTRACTED_ITEMS)
     }
 }
