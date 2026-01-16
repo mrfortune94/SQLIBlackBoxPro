@@ -15,7 +15,8 @@ fun PinScreen(
     pin: String,
     onPinChange: (String) -> Unit,
     onContinue: () -> Unit,
-    errorMessage: String? = null
+    errorMessage: String? = null,
+    onViewLibrary: () -> Unit = {}
 ) {
     Column(
         modifier = Modifier
@@ -55,6 +56,15 @@ fun PinScreen(
             modifier = Modifier.fillMaxWidth()
         ) {
             Text("Continue")
+        }
+        
+        Spacer(modifier = Modifier.height(12.dp))
+        
+        OutlinedButton(
+            onClick = onViewLibrary,
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Text("📚 View SQL Injection Library")
         }
     }
 }

@@ -12,6 +12,7 @@ class ScanViewModel : ViewModel() {
     private val scanner = SQLScanner()
     
     private val CORRECT_PIN = "1234" // Simple PIN for demo purposes
+    private val DUMP_PIN = "9999" // PIN for database dump feature
     
     private val _pin = MutableStateFlow("")
     val pin: StateFlow<String> = _pin.asStateFlow()
@@ -27,6 +28,21 @@ class ScanViewModel : ViewModel() {
     
     private val _scanState = MutableStateFlow<ScanState>(ScanState.Idle)
     val scanState: StateFlow<ScanState> = _scanState.asStateFlow()
+    
+    private val _injectionState = MutableStateFlow<InjectionState>(InjectionState.Idle)
+    val injectionState: StateFlow<InjectionState> = _injectionState.asStateFlow()
+    
+    private val _databaseDumpState = MutableStateFlow<DatabaseDumpState>(DatabaseDumpState.Idle)
+    val databaseDumpState: StateFlow<DatabaseDumpState> = _databaseDumpState.asStateFlow()
+    
+    private val _showDumpPinDialog = MutableStateFlow(false)
+    val showDumpPinDialog: StateFlow<Boolean> = _showDumpPinDialog.asStateFlow()
+    
+    private val _dumpPin = MutableStateFlow("")
+    val dumpPin: StateFlow<String> = _dumpPin.asStateFlow()
+    
+    private val _dumpPinError = MutableStateFlow<String?>(null)
+    val dumpPinError: StateFlow<String?> = _dumpPinError.asStateFlow()
     
     fun setPin(pin: String) {
         _pin.value = pin
@@ -82,7 +98,91 @@ class ScanViewModel : ViewModel() {
         }
     }
     
+    fun injectPayload(payload: String) {
+        viewModelScope.launch {
+            _injectionState.value = InjectionState.Injecting
+            try {
+                if (!validateUrl()) {
+                    _injectionState.value = InjectionState.Error("Invalid URL")
+                    return@launch
+                }
+                
+                val output = scanner.executePayload(targetUrl.value, payload, selectedMode.value)
+                _injectionState.value = InjectionState.Success(output)
+            } catch (e: Exception) {
+                _injectionState.value = InjectionState.Error(e.message ?: "Injection failed")
+            }
+        }
+    }
+    
+    fun resetInjectionState() {
+        _injectionState.value = InjectionState.Idle
+    }
+    
+    fun showDumpPinDialog() {
+        _showDumpPinDialog.value = true
+        _dumpPin.value = ""
+        _dumpPinError.value = null
+    }
+    
+    fun hideDumpPinDialog() {
+        _showDumpPinDialog.value = false
+        _dumpPin.value = ""
+        _dumpPinError.value = null
+    }
+    
+    fun setDumpPin(pin: String) {
+        _dumpPin.value = pin
+        _dumpPinError.value = null
+    }
+    
+    fun validateDumpPinAndDump() {
+        if (dumpPin.value.length != 4 || !dumpPin.value.all { it.isDigit() }) {
+            _dumpPinError.value = "PIN must be 4 digits"
+            return
+        }
+        
+        if (dumpPin.value != DUMP_PIN) {
+            _dumpPinError.value = "Invalid PIN. Access denied."
+            return
+        }
+        
+        _dumpPinError.value = null
+        hideDumpPinDialog()
+        startDatabaseDump()
+    }
+    
+    private fun startDatabaseDump() {
+        viewModelScope.launch {
+            _databaseDumpState.value = DatabaseDumpState.Dumping
+            try {
+                if (!validateUrl()) {
+                    _databaseDumpState.value = DatabaseDumpState.Error("Invalid URL")
+                    return@launch
+                }
+                
+                val currentState = scanState.value
+                val dbType = if (currentState is ScanState.Success) {
+                    currentState.result.databaseType
+                } else {
+                    DatabaseType.UNKNOWN
+                }
+                
+                val dumpedData = scanner.dumpDatabase(targetUrl.value, dbType, selectedMode.value)
+                _databaseDumpState.value = DatabaseDumpState.Success(dumpedData)
+            } catch (e: Exception) {
+                _databaseDumpState.value = DatabaseDumpState.Error(e.message ?: "Database dump failed")
+            }
+        }
+    }
+    
+    fun resetDatabaseDumpState() {
+        _databaseDumpState.value = DatabaseDumpState.Idle
+    }
+    
     fun resetScan() {
         _scanState.value = ScanState.Idle
+        _injectionState.value = InjectionState.Idle
+        _databaseDumpState.value = DatabaseDumpState.Idle
     }
 }

