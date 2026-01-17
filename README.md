@@ -2,59 +2,97 @@
 
 A professional SQL injection testing tool for Android built with Jetpack Compose.
 
+## 🔒 Security Architecture
+
+This application implements **FAIL-CLOSED TOR ROUTING** for maximum anonymity and security:
+
+### Mandatory Security Features
+
+1. **Official Orbot (Real Tor Network)**
+   - Uses the real Tor network via Orbot
+   - Maintained and audited by the Tor Project
+   - No simulated or embedded Tor implementations
+
+2. **Forced Tor Routing (Fail-Closed)**
+   - ALL app traffic routed through Orbot's SOCKS proxy (127.0.0.1:9050)
+   - Network access BLOCKED if Tor disconnects
+   - App REFUSES to run unless Tor is active
+   - Prevents: IP leaks, DNS leaks, silent clearnet fallback
+
+3. **App-Level Tor Routing**
+   - Only this app uses Tor (not system-wide)
+   - Reduces fingerprinting
+   - Doesn't break system services
+
 ## Features
 
 - **PIN Protection**: Secure 4-digit PIN entry
-- **Multiple Scan Modes**:
-  - **Standard**: Direct HTTP requests
-  - **Tor**: Routes traffic through Tor network via SOCKS proxy (127.0.0.1:9050)
-  - **Stealth**: Randomized User-Agent spoofing for evasion
+- **Mandatory Tor Routing**: 
+  - Enforces Tor connection before any scanning
+  - Fail-closed architecture prevents leaks
+  - Real-time Tor status verification
 - **Comprehensive Payload Library**: 
   - MySQL, PostgreSQL, MSSQL, Oracle, and SQLite injection payloads
   - Error-based and UNION-based SQL injection techniques
 - **Database Detection**: Automatically identifies database type from error responses
 - **Data Extraction**: Attempts to extract sensitive data from vulnerable endpoints
+- **Database Dump**: 
+  - Comprehensive database enumeration
+  - User credentials extraction
+  - Table and schema discovery
+  - **DB DOWNLOAD (USERS)** button to save results to device storage
 - **Real-time Results**: Displays vulnerabilities, database type, and extracted data
 
 ## Architecture
 
 ### Navigation Flow
 ```
-PIN Screen → URL Input → Mode Selection → Scanning → Results
+PIN Screen → URL Input → Tor Check → Secure Scanning → Results
 ```
 
 ### Core Components
 
 #### 1. **Models.kt**
-- `ScanMode`: Enum for scan modes (STANDARD, TOR, STEALTH)
+- `ScanMode`: TOR mode (enforced)
 - `DatabaseType`: Detected database types (MySQL, PostgreSQL, etc.)
-- `ScanResult`: Contains vulnerability status, database type, extracted data
+- `ScanResult`: Contains vulnerability status, database type, extracted data, database dump
 - `ScanState`: Manages scan lifecycle (Idle, Scanning, Success, Error)
+- `TorState`: Tor connection states (Checking, NotInstalled, InstalledNotRunning, Running, Error)
+- `DatabaseDump`: Comprehensive database extraction results
 
 #### 2. **SQLPayloads.kt**
 - `DETECTION_PAYLOADS`: Basic SQL injection tests
 - `MYSQL_PAYLOADS`, `POSTGRESQL_PAYLOADS`, etc.: Database-specific payloads
 - `DATA_EXTRACTION_PAYLOADS`: Attempts to extract user data, tables, schemas
+- `MYSQL_DUMP_PAYLOADS`, `POSTGRESQL_DUMP_PAYLOADS`, etc.: Comprehensive database enumeration
 
 #### 3. **SQLScanner.kt**
-- **Standard Mode**: Direct HTTP requests using OkHttp
-- **Tor Mode**: Configures SOCKS proxy (127.0.0.1:9050) for Tor routing
-- **Stealth Mode**: Rotates through realistic User-Agent strings
+- **Tor-Only Mode**: All requests route through Tor SOCKS proxy (127.0.0.1:9050)
+- **Fail-Closed Verification**: Checks Tor connection before each scan
 - **Error Detection**: Pattern matching for SQL error messages
 - **Database Detection**: Identifies DB type from error signatures
 - **Data Extraction**: Parses responses for leaked credentials and data
+- **Database Dump**: Comprehensive enumeration of users, tables, schemas
 
-#### 4. **ScanViewModel.kt**
+#### 4. **TorManager (OrbotHelper.kt)**
+- Orbot installation detection
+- Tor connection status verification
+- Launch Orbot functionality
+- Play Store redirection for installation
+
+#### 5. **ScanViewModel.kt**
 - Manages application state using Kotlin StateFlow
 - Input validation for PIN and URL
 - Asynchronous scanning with Coroutines
+- Tor status management
 - Error handling and state transitions
 
-#### 5. **UI Screens (Jetpack Compose)**
+#### 6. **UI Screens (Jetpack Compose)**
 - `PinScreen.kt`: PIN entry with masked input
 - `UrlScreen.kt`: URL input with validation
-- `ModeScreen.kt`: Radio button selection for scan modes
-- `ResultsScreen.kt`: Displays scan results with loading states
+- `TorCheckScreen.kt`: Tor status verification and enforcement
+- `ModeScreen.kt`: Security information display (Tor-only)
+- `ResultsScreen.kt`: Displays scan results with database dump download
 - `MainActivity.kt`: Navigation and app composition
 
 ## Building the App
@@ -101,14 +139,23 @@ org.jetbrains.kotlinx:kotlinx-coroutines-android:1.7.3
 
 1. **Launch the app** and enter a 4-digit PIN
 2. **Enter target URL** (e.g., `http://example.com/page.php?id=1`)
-3. **Select scan mode**:
-   - Standard for direct testing
-   - Tor for anonymous scanning (requires Tor running on port 9050)
-   - Stealth for user-agent rotation
-4. **Start scan** and wait for results
-5. **Review findings**: Vulnerability status, database type, successful payload, and extracted data
+3. **Tor Check**: The app verifies Tor is running
+   - If Orbot is not installed, you'll be prompted to install it
+   - If Tor is not running, you'll be prompted to start it
+   - Scanning is BLOCKED until Tor is active
+4. **Review Security**: Confirm fail-closed security features are active
+5. **Start scan** and wait for results
+6. **Review findings**: Vulnerability status, database type, successful payload, and extracted data
+7. **Download Database Dump**: Click "DB DOWNLOAD (USERS)" to save comprehensive results to device storage
 
 ## Security Features
+
+### Fail-Closed Architecture
+The scanner implements fail-closed security:
+1. Verifies Tor connection before URL entry completes
+2. Checks Tor status again before each scan
+3. Throws SecurityException if Tor disconnects during scan
+4. Blocks all network activity when Tor is unavailable
 
 ### Injection Detection
 The scanner tests for vulnerabilities by:
@@ -124,24 +171,33 @@ Identifies databases by matching error messages:
 - **Oracle**: "ORA-", "oracle"
 - **SQLite**: "sqlite", "sqlite3"
 
-### Data Extraction
-Attempts to extract:
+### Database Dump & Data Extraction
+Comprehensive enumeration attempts to extract:
 - User credentials (username:hash patterns)
-- Database names
-- Table names
+- Database names and schemas
+- Table names and structures
 - Column information
+- Full database dumps saved to device storage
 
 ## Network Requirements
 
-### Tor Mode
-For Tor mode to work, you need:
-1. Tor service running locally
-2. SOCKS proxy listening on 127.0.0.1:9050
+### Tor Mode (Mandatory)
+For the app to work, you need:
+1. **Orbot installed** from Google Play Store
+2. **Tor service running** in Orbot
+3. SOCKS proxy listening on 127.0.0.1:9050
 
 ### Permissions
 The app requires:
-- `INTERNET`: For HTTP requests
+- `INTERNET`: For HTTP requests through Tor
 - `ACCESS_NETWORK_STATE`: To check network availability
+- `WRITE_EXTERNAL_STORAGE`: To save database dump files (Android 12 and below)
+- `READ_EXTERNAL_STORAGE`: To access saved dump files (Android 12 and below)
+
+### Storage Location
+Database dumps are saved to:
+- `<External Storage>/Android/data/com.sqliblackboxpro/files/Documents/SQLIBlackBoxPro_Dumps/`
+- Files named: `db_dump_YYYY-MM-DD_HH-mm-ss.txt`
 
 ## Building the App
 

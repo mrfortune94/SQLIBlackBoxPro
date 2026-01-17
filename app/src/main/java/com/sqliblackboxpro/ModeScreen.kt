@@ -1,13 +1,12 @@
 package com.sqliblackboxpro
 
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.selection.selectable
-import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 
 @Composable
@@ -24,103 +23,102 @@ fun ModeScreen(
         verticalArrangement = Arrangement.Center
     ) {
         Text(
-            text = "Select Scan Mode",
+            text = "🔒 Secure Tor Scanning",
             style = MaterialTheme.typography.headlineMedium,
-            modifier = Modifier.padding(bottom = 32.dp)
+            fontWeight = FontWeight.Bold,
+            modifier = Modifier.padding(bottom = 16.dp)
         )
         
-        Column(
-            modifier = Modifier
-                .selectableGroup()
-                .fillMaxWidth()
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            colors = CardDefaults.cardColors(
+                containerColor = MaterialTheme.colorScheme.primaryContainer
+            )
         ) {
-            ModeOption(
-                mode = ScanMode.STANDARD,
-                label = "Standard",
-                description = "Direct HTTP requests",
-                isSelected = selectedMode == ScanMode.STANDARD,
-                onSelected = onModeSelected
-            )
-            
-            Spacer(modifier = Modifier.height(12.dp))
-            
-            ModeOption(
-                mode = ScanMode.TOR,
-                label = "Tor (SOCKS Proxy)",
-                description = "Route through Tor network (127.0.0.1:9050)",
-                isSelected = selectedMode == ScanMode.TOR,
-                onSelected = onModeSelected
-            )
-            
-            Spacer(modifier = Modifier.height(12.dp))
-            
-            ModeOption(
-                mode = ScanMode.STEALTH,
-                label = "Stealth",
-                description = "Randomized User-Agent spoofing",
-                isSelected = selectedMode == ScanMode.STEALTH,
-                onSelected = onModeSelected
-            )
+            Column(modifier = Modifier.padding(20.dp)) {
+                Text(
+                    text = "✅ FAIL-CLOSED SECURITY ACTIVE",
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.primary,
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier.fillMaxWidth()
+                )
+                
+                Spacer(modifier = Modifier.height(16.dp))
+                
+                Text(
+                    text = "All traffic will be routed through Tor:",
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.Bold
+                )
+                
+                Spacer(modifier = Modifier.height(12.dp))
+                
+                SecurityFeature("✓ Official Orbot (Real Tor Network)")
+                SecurityFeature("✓ Forced Tor routing via SOCKS proxy")
+                SecurityFeature("✓ App-level routing (not system-wide)")
+                SecurityFeature("✓ No direct connections allowed")
+                SecurityFeature("✓ IP leak protection")
+                SecurityFeature("✓ DNS leak protection")
+                SecurityFeature("✓ Scan blocked if Tor disconnects")
+                
+                Spacer(modifier = Modifier.height(16.dp))
+                
+                Card(
+                    colors = CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.tertiaryContainer
+                    )
+                ) {
+                    Column(modifier = Modifier.padding(12.dp)) {
+                        Text(
+                            text = "⚠️ ANONYMITY NOTICE",
+                            style = MaterialTheme.typography.labelLarge,
+                            fontWeight = FontWeight.Bold
+                        )
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text(
+                            text = "This app enforces Tor for all network activity. If Tor disconnects during scanning, the scan will immediately fail to prevent IP exposure.",
+                            style = MaterialTheme.typography.bodySmall
+                        )
+                    }
+                }
+            }
         }
         
         Spacer(modifier = Modifier.height(32.dp))
         
         Button(
             onClick = onStartScan,
-            modifier = Modifier.fillMaxWidth()
+            modifier = Modifier.fillMaxWidth(),
+            colors = ButtonDefaults.buttonColors(
+                containerColor = MaterialTheme.colorScheme.primary
+            )
         ) {
-            Text("Start Scan")
+            Text("Start Secure Scan via Tor", style = MaterialTheme.typography.titleMedium)
         }
+        
+        Spacer(modifier = Modifier.height(16.dp))
+        
+        Text(
+            text = "Connection: 127.0.0.1:9050 (Tor SOCKS)",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
     }
 }
 
 @Composable
-fun ModeOption(
-    mode: ScanMode,
-    label: String,
-    description: String,
-    isSelected: Boolean,
-    onSelected: (ScanMode) -> Unit
-) {
-    Card(
+fun SecurityFeature(text: String) {
+    Row(
         modifier = Modifier
             .fillMaxWidth()
-            .selectable(
-                selected = isSelected,
-                onClick = { onSelected(mode) },
-                role = Role.RadioButton
-            ),
-        colors = CardDefaults.cardColors(
-            containerColor = if (isSelected) 
-                MaterialTheme.colorScheme.primaryContainer 
-            else 
-                MaterialTheme.colorScheme.surface
-        )
+            .padding(vertical = 4.dp),
+        verticalAlignment = Alignment.CenterVertically
     ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(16.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            RadioButton(
-                selected = isSelected,
-                onClick = null
-            )
-            
-            Spacer(modifier = Modifier.width(12.dp))
-            
-            Column {
-                Text(
-                    text = label,
-                    style = MaterialTheme.typography.titleMedium
-                )
-                Text(
-                    text = description,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
-        }
+        Text(
+            text = text,
+            style = MaterialTheme.typography.bodyMedium
+        )
     }
 }

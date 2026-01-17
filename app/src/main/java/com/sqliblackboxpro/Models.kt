@@ -20,7 +20,15 @@ data class ScanResult(
     val databaseType: DatabaseType,
     val extractedData: List<String>,
     val payloadUsed: String,
-    val responseDetails: String
+    val responseDetails: String,
+    val databaseDump: DatabaseDump? = null
+)
+
+data class DatabaseDump(
+    val users: List<String>,
+    val tables: List<String>,
+    val schemas: List<String>,
+    val allData: String
 )
 
 sealed class ScanState {
