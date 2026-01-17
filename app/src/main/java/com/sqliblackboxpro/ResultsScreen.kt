@@ -1,20 +1,31 @@
 package com.sqliblackboxpro
 
+import android.content.Context
+import android.os.Environment
+import android.widget.Toast
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Download
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import java.io.File
+import java.text.SimpleDateFormat
+import java.util.*
 
 @Composable
 fun ResultsScreen(
     scanState: ScanState,
     onNewScan: () -> Unit
 ) {
+    val context = LocalContext.current
+    
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -140,7 +151,7 @@ fun ResultsScreen(
                     Card(modifier = Modifier.fillMaxWidth()) {
                         Column(modifier = Modifier.padding(16.dp)) {
                             Text(
-                                text = "Response Details",
+                                 text = "Response Details",
                                 style = MaterialTheme.typography.titleMedium,
                                 fontWeight = FontWeight.Bold
                             )
@@ -151,6 +162,68 @@ fun ResultsScreen(
                                 style = MaterialTheme.typography.bodySmall,
                                 fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace
                             )
+                        }
+                    }
+                    
+                    // Database Dump Section
+                    if (result.databaseDump != null) {
+                        Spacer(modifier = Modifier.height(12.dp))
+                        
+                        Card(
+                            modifier = Modifier.fillMaxWidth(),
+                            colors = CardDefaults.cardColors(
+                                containerColor = MaterialTheme.colorScheme.tertiaryContainer
+                            )
+                        ) {
+                            Column(modifier = Modifier.padding(16.dp)) {
+                                Text(
+                                    text = "🗄️ Database Dump Available",
+                                    style = MaterialTheme.typography.titleMedium,
+                                    fontWeight = FontWeight.Bold
+                                )
+                                Spacer(modifier = Modifier.height(8.dp))
+                                
+                                result.databaseDump.users.takeIf { it.isNotEmpty() }?.let { users ->
+                                    Text(
+                                        text = "Users Found: ${users.size}",
+                                        style = MaterialTheme.typography.bodyMedium
+                                    )
+                                }
+                                
+                                result.databaseDump.tables.takeIf { it.isNotEmpty() }?.let { tables ->
+                                    Text(
+                                        text = "Tables Found: ${tables.size}",
+                                        style = MaterialTheme.typography.bodyMedium
+                                    )
+                                }
+                                
+                                result.databaseDump.schemas.takeIf { it.isNotEmpty() }?.let { schemas ->
+                                    Text(
+                                        text = "Schemas Found: ${schemas.size}",
+                                        style = MaterialTheme.typography.bodyMedium
+                                    )
+                                }
+                                
+                                Spacer(modifier = Modifier.height(12.dp))
+                                
+                                Button(
+                                    onClick = {
+                                        downloadDatabaseDump(context, result.databaseDump)
+                                    },
+                                    modifier = Modifier.fillMaxWidth(),
+                                    colors = ButtonDefaults.buttonColors(
+                                        containerColor = MaterialTheme.colorScheme.tertiary
+                                    )
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.Download,
+                                        contentDescription = null,
+                                        modifier = Modifier.size(20.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    Text("DB DOWNLOAD (USERS)")
+                                }
+                            }
                         }
                     }
                 }
@@ -197,5 +270,42 @@ fun ResultsScreen(
                 }
             }
         }
+    }
+}
+
+/**
+ * Download database dump to app's external storage folder
+ */
+private fun downloadDatabaseDump(context: Context, dump: DatabaseDump) {
+    try {
+        // Get the app's external storage directory
+        val appDir = context.getExternalFilesDir(Environment.DIRECTORY_DOCUMENTS)
+            ?: context.filesDir // Fallback to internal storage
+        
+        // Create SQLIBlackBoxPro directory if it doesn't exist
+        val sqlDumpDir = File(appDir, "SQLIBlackBoxPro_Dumps")
+        if (!sqlDumpDir.exists()) {
+            sqlDumpDir.mkdirs()
+        }
+        
+        // Generate filename with timestamp
+        val timestamp = SimpleDateFormat("yyyy-MM-dd_HH-mm-ss", Locale.US).format(Date())
+        val filename = "db_dump_$timestamp.txt"
+        val file = File(sqlDumpDir, filename)
+        
+        // Write dump to file
+        file.writeText(dump.allData)
+        
+        Toast.makeText(
+            context,
+            "Database dump downloaded to:\n${file.absolutePath}",
+            Toast.LENGTH_LONG
+        ).show()
+    } catch (e: Exception) {
+        Toast.makeText(
+            context,
+            "Failed to download database dump: ${e.message}",
+            Toast.LENGTH_LONG
+        ).show()
     }
 }
