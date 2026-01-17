@@ -78,8 +78,8 @@ class ScanViewModel : ViewModel() {
         viewModelScope.launch {
             _scanState.value = ScanState.Scanning
             try {
-                // FAIL-CLOSED: Always use TOR mode
-                val result = scanner.scanURL(targetUrl.value, ScanMode.TOR)
+                // FAIL-CLOSED: Always use TOR mode (only mode available)
+                val result = scanner.scanURL(targetUrl.value)
                 _scanState.value = ScanState.Success(result)
             } catch (e: SecurityException) {
                 // Tor disconnected during scan

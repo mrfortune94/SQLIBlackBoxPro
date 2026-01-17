@@ -288,8 +288,14 @@ private fun downloadDatabaseDump(context: Context, dump: DatabaseDump) {
             sqlDumpDir.mkdirs()
         }
         
-        // Generate filename with timestamp
-        val timestamp = SimpleDateFormat("yyyy-MM-dd_HH-mm-ss", Locale.US).format(Date())
+        // Generate filename with timestamp (thread-safe)
+        val timestamp = if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
+            java.time.LocalDateTime.now()
+                .format(java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd_HH-mm-ss"))
+        } else {
+            // Fallback for older Android versions
+            SimpleDateFormat("yyyy-MM-dd_HH-mm-ss", Locale.US).format(Date())
+        }
         val filename = "db_dump_$timestamp.txt"
         val file = File(sqlDumpDir, filename)
         

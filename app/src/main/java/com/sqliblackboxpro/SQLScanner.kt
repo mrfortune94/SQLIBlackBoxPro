@@ -36,7 +36,7 @@ class SQLScanner {
         }
     }
     
-    suspend fun scanURL(url: String, mode: ScanMode): ScanResult {
+    suspend fun scanURL(url: String): ScanResult {
         // FAIL-CLOSED ENFORCEMENT: Verify Tor is running
         if (!verifyTorConnection()) {
             throw SecurityException("FAIL-CLOSED: Tor is not running. Cannot proceed without Tor for anonymity.")
