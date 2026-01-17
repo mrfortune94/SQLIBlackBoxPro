@@ -1,3 +1,5 @@
+// Mirror repositories added to handle CI environments where dl.google.com may be blocked
+// Gradle tries repositories in order, so primary repositories are listed first with mirrors as fallbacks
 pluginManagement {
     repositories {
         google {

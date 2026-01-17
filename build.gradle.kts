@@ -1,6 +1,8 @@
 // Top-level build file where you can add configuration options common to all sub-projects/modules.
 buildscript {
     repositories {
+        // Mirror repositories added to handle CI environments where dl.google.com may be blocked
+        // Gradle tries repositories in order, so primary repositories are listed first with mirrors as fallbacks
         google {
             content {
                 includeGroupByRegex("com\\.android.*")
